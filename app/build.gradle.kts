@@ -9,7 +9,7 @@ android {
   namespace = "com.fillmark.app"
   compileSdk = 36
   defaultConfig {
-    applicationId = "com.fillmark.app"
+    applicationId = "ca.bralten.fillmark"
     minSdk = 29
     targetSdk = 35
     versionCode = 1
