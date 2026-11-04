@@ -55,11 +55,13 @@ class QuickLogActionCallback : ActionCallback {
             ).show()
         }
 
-        // Trigger Health Connect sync asynchronously
-        CoroutineScope(Dispatchers.IO).launch {
-            val hc = HealthConnectManager(context)
-            if (hc.isAvailable() && hc.hasAllPermissions()) {
-                hc.syncOutbound(database)
+        // Trigger Health Connect sync asynchronously if enabled
+        if (prefs.healthConnectSyncEnabled) {
+            CoroutineScope(Dispatchers.IO).launch {
+                val hc = HealthConnectManager(context)
+                if (hc.isAvailable() && hc.hasAllPermissions()) {
+                    hc.syncOutbound(database)
+                }
             }
         }
 

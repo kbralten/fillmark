@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.fillmark.app.core.DisplayUnit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
@@ -38,6 +39,7 @@ class UserPreferencesRepository(private val context: Context) {
         private val KEY_WAKING_PACING_ENABLED = booleanPreferencesKey("waking_pacing_enabled")
         private val KEY_HEALTH_CONNECT_SYNC_ENABLED = booleanPreferencesKey("health_connect_sync_enabled")
         private val KEY_HEALTH_CONNECT_BIDIRECTIONAL = booleanPreferencesKey("health_connect_bidirectional")
+        private val KEY_HEALTH_CONNECT_CHANGES_TOKEN = stringPreferencesKey("health_connect_changes_token")
     }
 
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
@@ -91,6 +93,21 @@ class UserPreferencesRepository(private val context: Context) {
         dataStore.edit { preferences ->
             preferences[KEY_HEALTH_CONNECT_SYNC_ENABLED] = enabled
             preferences[KEY_HEALTH_CONNECT_BIDIRECTIONAL] = bidirectional
+        }
+    }
+
+    suspend fun getHealthConnectChangesToken(): String? {
+        val preferences = dataStore.data.first()
+        return preferences[KEY_HEALTH_CONNECT_CHANGES_TOKEN]
+    }
+
+    suspend fun setHealthConnectChangesToken(token: String?) {
+        dataStore.edit { preferences ->
+            if (token == null) {
+                preferences.remove(KEY_HEALTH_CONNECT_CHANGES_TOKEN)
+            } else {
+                preferences[KEY_HEALTH_CONNECT_CHANGES_TOKEN] = token
+            }
         }
     }
 }

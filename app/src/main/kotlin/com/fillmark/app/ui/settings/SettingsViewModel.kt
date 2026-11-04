@@ -1,13 +1,18 @@
 package com.fillmark.app.ui.settings
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.UserPreferences
 import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.sync.HealthConnectManager
+import com.fillmark.app.sync.HealthConnectSyncWorker
 import com.fillmark.app.widget.WidgetUpdateHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,6 +92,18 @@ class SettingsViewModel @JvmOverloads constructor(
     fun setHealthConnectSync(enabled: Boolean, bidirectional: Boolean) {
         viewModelScope.launch {
             preferencesRepository.updateHealthConnectSettings(enabled, bidirectional)
+            if (enabled) {
+                try {
+                    val syncRequest = OneTimeWorkRequestBuilder<HealthConnectSyncWorker>().build()
+                    WorkManager.getInstance(getApplication()).enqueueUniqueWork(
+                        "HealthConnectOutboundSync",
+                        ExistingWorkPolicy.REPLACE,
+                        syncRequest
+                    )
+                } catch (e: Exception) {
+                    Log.e("SettingsViewModel", "Failed to enqueue initial Health Connect sync", e)
+                }
+            }
         }
     }
 
