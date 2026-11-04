@@ -47,6 +47,13 @@ import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.ui.dashboard.components.getPresetVector
 import com.fillmark.app.ui.history.components.EditLogDialog
 
+import androidx.compose.foundation.BorderStroke
+import com.fillmark.app.ui.theme.FillmarkCardBorder
+import com.fillmark.app.ui.theme.FillmarkCyan
+import com.fillmark.app.ui.theme.FillmarkCyanDark
+import com.fillmark.app.ui.theme.FillmarkNavyTitle
+import com.fillmark.app.ui.theme.FillmarkSlateMuted
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
@@ -74,29 +81,47 @@ fun HistoryScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
-        if (uiState.dayGroups.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No drink history recorded yet.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "Intake History",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = FillmarkNavyTitle
+                    )
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+
+            if (uiState.dayGroups.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No drink history recorded yet.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = FillmarkSlateMuted
+                        )
+                    }
+                }
+            } else {
                 uiState.dayGroups.forEach { dayGroup ->
                     item(key = "header_${dayGroup.dateIso}") {
                         DayHeader(
@@ -171,10 +196,11 @@ private fun HistoryRecordItem(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
+        border = BorderStroke(1.dp, FillmarkCardBorder),
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -182,19 +208,19 @@ private fun HistoryRecordItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = FillmarkCyan.copy(alpha = 0.15f),
                 modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         painter = androidx.compose.ui.res.painterResource(id = com.fillmark.app.core.PresetIcon.getDrawableRes(record.iconKey)),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = FillmarkCyanDark,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -205,12 +231,12 @@ private fun HistoryRecordItem(
                     text = record.drinkType.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = FillmarkNavyTitle
                 )
                 Text(
                     text = TimeUtils.formatTime(record.timestamp),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = FillmarkSlateMuted
                 )
             }
 
@@ -221,7 +247,7 @@ private fun HistoryRecordItem(
                     text = VolumeConverter.formatVolume(record.effectiveVolumeMl, displayUnit),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = FillmarkNavyTitle
                 )
                 if (record.hydrationFactor != 1.0) {
                     Text(

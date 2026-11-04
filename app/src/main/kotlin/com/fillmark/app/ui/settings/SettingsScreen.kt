@@ -52,6 +52,9 @@ import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.sync.HealthConnectManager
 
+import com.fillmark.app.ui.theme.FillmarkCardBorder
+import com.fillmark.app.ui.theme.FillmarkNavyTitle
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -92,16 +95,17 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(
-            text = "Preferences",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            text = "Settings",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = FillmarkNavyTitle
         )
 
         // Card 1: Units
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, FillmarkCardBorder),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {

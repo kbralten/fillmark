@@ -26,18 +26,42 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
+import androidx.compose.ui.graphics.Color
+
 private val DarkColorScheme = darkColorScheme(
     primary = primaryDark,
+    onPrimary = FillmarkNavy900,
     primaryContainer = primaryContainerDark,
+    onPrimaryContainer = Color.White,
     secondary = secondaryDark,
-    tertiary = tertiaryDark
+    onSecondary = FillmarkNavy900,
+    tertiary = tertiaryDark,
+    background = Color(0xFF091420),
+    onBackground = Color(0xFFE2E8F0),
+    surface = Color(0xFF0F1E2E),
+    onSurface = Color(0xFFF1F5F9),
+    surfaceVariant = Color(0xFF162A3D),
+    onSurfaceVariant = Color(0xFF94A3B8),
+    outline = Color(0xFF243B52),
+    outlineVariant = Color(0xFF1B3145)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = primaryLight,
+    onPrimary = Color.White,
     primaryContainer = primaryContainerLight,
+    onPrimaryContainer = FillmarkNavy900,
     secondary = secondaryLight,
-    tertiary = tertiaryLight
+    onSecondary = Color.White,
+    tertiary = tertiaryLight,
+    background = FillmarkBackground,
+    onBackground = FillmarkNavyTitle,
+    surface = FillmarkSurface,
+    onSurface = FillmarkNavyTitle,
+    surfaceVariant = FillmarkSurfaceVariant,
+    onSurfaceVariant = FillmarkSlateMuted,
+    outline = FillmarkCardBorder,
+    outlineVariant = Color(0xFFD6E0EA)
 )
 
 @Composable

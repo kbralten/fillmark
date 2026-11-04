@@ -18,20 +18,49 @@ package com.fillmark.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-//Start - Partial Color List
+// Fillmark Modern Navy & Teal Palette (Android 14 M3)
+val FillmarkNavy900 = Color(0xFF091724) // Midnight navy (Bottom navigation bar, dark elements)
+val FillmarkNavy800 = Color(0xFF0F2033) // Deep dark navy (Chart card, preset card base)
+val FillmarkNavy700 = Color(0xFF172C42) // Dark navy (Bar chart track slots, chip backgrounds)
+val FillmarkNavyTitle = Color(0xFF0D1E32) // Primary title navy ("Fillmark", "Drink Analytics")
+val FillmarkCyan = Color(0xFF20D2DE) // Vibrant cyan/teal (FAB, gauge progress arc, badges)
+val FillmarkCyanDark = Color(0xFF007A87) // Readable primary cyan for text on light backgrounds
+val FillmarkCyanContainer = Color(0xFFD0F4F7) // Soft cyan container
+val FillmarkIndigo = Color(0xFF133B5C) // Deep indigo track for dual-progress gauge
+val FillmarkSlateMuted = Color(0xFF6B7C8E) // Subtitles, inactive tabs, units
+val FillmarkBackground = Color(0xFFF6F9FB) // Premium light background
+val FillmarkSurface = Color(0xFFFFFFFF)
+val FillmarkSurfaceVariant = Color(0xFFEEF3F7)
+val FillmarkCardBorder = Color(0xFFE2E8F0)
 
-//Light Colors
-val primaryLight = Color(0xFF00506E)
-val primaryContainerLight = Color(0xFF23759B)
-val secondaryLight = Color(0xFF486271)
-val tertiaryLight = Color(0xFF613A73)
+// Pace status notification pill colors
+val PaceBehindBg = Color(0xFFFBEAE5)
+val PaceBehindBorder = Color(0xFFF5C5BC)
+val PaceBehindText = Color(0xFF8C261B)
+val PaceBehindIcon = Color(0xFFDC4C3E)
 
+val PaceOnTrackBg = Color(0xFFE6F7F9)
+val PaceOnTrackBorder = Color(0xFFB4EAF0)
+val PaceOnTrackText = Color(0xFF0F5A66)
+val PaceOnTrackIcon = Color(0xFF0891B2)
 
-//Dark Colors
-val primaryDark = Color(0xFF87CFF9)
-val primaryContainerDark = Color(0xFF005C7D)
-val secondaryDark = Color(0xFFB0CADC)
-val tertiaryDark = Color(0xFFE6B5F8)
+val PaceAheadBg = Color(0xFFEBF8F2)
+val PaceAheadBorder = Color(0xFFBCECD2)
+val PaceAheadText = Color(0xFF14532D)
+val PaceAheadIcon = Color(0xFF16A34A)
+
+// Start - Partial Color List
+// Light Colors
+val primaryLight = FillmarkCyanDark
+val primaryContainerLight = FillmarkCyanContainer
+val secondaryLight = FillmarkIndigo
+val tertiaryLight = Color(0xFF0284C7)
+
+// Dark Colors
+val primaryDark = FillmarkCyan
+val primaryContainerDark = Color(0xFF004D55)
+val secondaryDark = Color(0xFF94B5D0)
+val tertiaryDark = Color(0xFF7DD3FC)
 
 //End - Partial Color List
 

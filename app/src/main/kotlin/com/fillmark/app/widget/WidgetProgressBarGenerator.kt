@@ -3,35 +3,37 @@ package com.fillmark.app.widget
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Shader
 
 object WidgetProgressBarGenerator {
 
     /**
-     * Creates a custom progress bar Bitmap with an optional on-track pacing marker dot
-     * and overflow color reflection for > 100% consumption.
+     * Creates a custom progress bar Bitmap matching the modern luminous cyan pill design
+     * with an orange/coral glowing pacing marker line and dot.
      */
     fun createProgressBarBitmap(
         context: Context,
         progress: Float,
         paceRatio: Float?,
         widthDp: Int = 280,
-        heightDp: Int = 12
+        heightDp: Int = 20
     ): Bitmap {
         val density = context.resources.displayMetrics.density
         val widthPx = (widthDp * density).toInt().coerceAtLeast(100)
-        val heightPx = (heightDp * density).toInt().coerceAtLeast(10)
+        val heightPx = (heightDp * density).toInt().coerceAtLeast(16)
         val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        val barHeight = heightPx * 0.7f
+        val barHeight = heightPx * 0.85f
         val barTop = (heightPx - barHeight) / 2f
         val cornerRadius = barHeight / 2f
 
-        // 1. Background Track
+        // 1. Background Track (Deep midnight navy pill)
         val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.parseColor("#33808080")
+            color = android.graphics.Color.parseColor("#0C2438")
         }
         canvas.drawRoundRect(
             RectF(0f, barTop, widthPx.toFloat(), barTop + barHeight),
@@ -40,24 +42,58 @@ object WidgetProgressBarGenerator {
             trackPaint
         )
 
-        // 2. Base Progress Fill (up to 100%)
-        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.parseColor("#2196F3")
-        }
+        // 2. Base Progress Fill (Luminous Cyan Capsule with inner glow)
         val baseFillWidth = (widthPx * progress.coerceIn(0f, 1f)).coerceAtLeast(0f)
-        if (baseFillWidth > 0) {
+        if (baseFillWidth > 0f) {
+            val fillRadius = cornerRadius.coerceAtMost(baseFillWidth / 2f)
+
+            // Outer cyan fill gradient
+            val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f, barTop,
+                    baseFillWidth, barTop + barHeight,
+                    android.graphics.Color.parseColor("#34F3FF"),
+                    android.graphics.Color.parseColor("#0EB5C4"),
+                    Shader.TileMode.CLAMP
+                )
+            }
             canvas.drawRoundRect(
                 RectF(0f, barTop, baseFillWidth, barTop + barHeight),
-                cornerRadius,
-                cornerRadius,
+                fillRadius,
+                fillRadius,
                 fillPaint
             )
+
+            // Inner luminous glow / highlight pill
+            if (baseFillWidth > 12 * density) {
+                val insetY = 2.5f * density
+                val insetX = 3f * density
+                val innerHeight = barHeight - (insetY * 2)
+                val innerWidth = (baseFillWidth - (insetX * 2)).coerceAtLeast(4f)
+                val innerRadius = innerHeight / 2f
+
+                val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = android.graphics.Color.parseColor("#66FFFFFF")
+                }
+                canvas.drawRoundRect(
+                    RectF(insetX, barTop + insetY, insetX + innerWidth, barTop + insetY + innerHeight),
+                    innerRadius,
+                    innerRadius,
+                    highlightPaint
+                )
+            }
         }
 
         // 3. Overflow Fill for > 100% consumption
         if (progress > 1f) {
             val overflowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.parseColor("#00E5FF")
+                shader = LinearGradient(
+                    0f, barTop,
+                    widthPx.toFloat(), barTop + barHeight,
+                    android.graphics.Color.parseColor("#64FFDA"),
+                    android.graphics.Color.parseColor("#00E5FF"),
+                    Shader.TileMode.CLAMP
+                )
             }
             val overflowWidth = (widthPx * (progress - 1f).coerceIn(0f, 1f)).coerceAtLeast(0f)
             if (overflowWidth > 0) {
@@ -70,23 +106,36 @@ object WidgetProgressBarGenerator {
             }
         }
 
-        // 4. "On track" expected pace marker dot
+        // 4. Glowing Pacing Marker (Vertical line + glowing orange dot)
         if (paceRatio != null) {
-            val dotX = (widthPx * paceRatio.coerceIn(0.04f, 0.96f))
-            val dotCenterY = heightPx / 2f
-            val dotRadius = heightPx * 0.44f
+            val markerX = (widthPx * paceRatio.coerceIn(0.04f, 0.96f))
+            val centerY = heightPx / 2f
 
-            // Outer ring
-            val outerDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.parseColor("#FF9800")
+            // Soft vertical glowing line
+            val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.parseColor("#CCFF7A50")
+                strokeWidth = 2.5f * density
+                strokeCap = Paint.Cap.ROUND
             }
-            canvas.drawCircle(dotX, dotCenterY, dotRadius, outerDotPaint)
+            canvas.drawLine(markerX, barTop - (1.5f * density), markerX, barTop + barHeight + (1.5f * density), linePaint)
 
-            // Inner white dot
-            val innerDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            // Outer glowing halo
+            val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.parseColor("#55FF7A50")
+            }
+            canvas.drawCircle(markerX, centerY, 6f * density, haloPaint)
+
+            // Center orange dot
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.parseColor("#FFFF7A50")
+            }
+            canvas.drawCircle(markerX, centerY, 3.5f * density, dotPaint)
+
+            // Core highlight
+            val corePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = android.graphics.Color.WHITE
             }
-            canvas.drawCircle(dotX, dotCenterY, dotRadius * 0.48f, innerDotPaint)
+            canvas.drawCircle(markerX, centerY, 1.5f * density, corePaint)
         }
 
         return bitmap

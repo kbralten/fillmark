@@ -24,20 +24,23 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.PresetEntity
+import com.fillmark.app.ui.theme.FillmarkCyan
+import com.fillmark.app.ui.theme.FillmarkNavyTitle
+import com.fillmark.app.ui.theme.FillmarkSlateMuted
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -60,18 +63,20 @@ fun QuickPresetBar(
         ) {
             Text(
                 text = "Quick Log",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = FillmarkNavyTitle
             )
-            TextButton(onClick = onCustomizePresets) {
+            IconButton(
+                onClick = onCustomizePresets,
+                modifier = Modifier.size(32.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Default.Tune,
                     contentDescription = "Customize presets",
-                    modifier = Modifier.size(16.dp)
+                    tint = FillmarkSlateMuted,
+                    modifier = Modifier.size(19.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Customize", style = MaterialTheme.typography.labelMedium)
             }
         }
 
@@ -79,7 +84,7 @@ fun QuickPresetBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             presets.forEach { preset ->
@@ -91,15 +96,17 @@ fun QuickPresetBar(
                 )
             }
 
-            // Add Preset Card
+            // Add Preset Card (matching tinted squircle style)
+            val newCardBg = getBlendedTileColor(FillmarkCyan)
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    containerColor = newCardBg
                 ),
+                border = BorderStroke(1.dp, FillmarkCyan.copy(alpha = 0.35f)),
                 modifier = Modifier
-                    .width(88.dp)
-                    .height(112.dp)
+                    .width(90.dp)
+                    .height(118.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .combinedClickable(onClick = onAddPreset)
             ) {
@@ -110,19 +117,21 @@ fun QuickPresetBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
+                    Spacer(modifier = Modifier.weight(1f))
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = "Add custom preset",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = FillmarkCyan,
                         modifier = Modifier.size(28.dp)
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "New",
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
+                        fontWeight = FontWeight.Bold,
+                        color = FillmarkCyan
                     )
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -138,15 +147,17 @@ private fun PresetCard(
     onLongClick: () -> Unit
 ) {
     val presetColor = parseHexColor(preset.colorHex)
+    val tileBg = getBlendedTileColor(presetColor)
 
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            containerColor = tileBg
         ),
-        border = BorderStroke(1.dp, presetColor.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, presetColor.copy(alpha = 0.35f)),
         modifier = Modifier
-            .width(108.dp)
+            .width(104.dp)
+            .height(118.dp)
             .clip(RoundedCornerShape(16.dp))
             .combinedClickable(
                 onClick = onClick,
@@ -154,46 +165,74 @@ private fun PresetCard(
             )
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             val iconRes = PresetIcon.getDrawableRes(preset.iconKey)
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = presetColor.copy(alpha = 0.18f),
-                border = BorderStroke(1.dp, presetColor.copy(alpha = 0.5f)),
-                modifier = Modifier.size(42.dp)
+            Box(
+                modifier = Modifier
+                    .size(34.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = painterResource(id = iconRes),
-                        contentDescription = preset.label,
-                        tint = presetColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = preset.label,
+                    tint = presetColor,
+                    modifier = Modifier.size(28.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = preset.label,
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                color = MaterialTheme.colorScheme.onSurface
+                overflow = TextOverflow.Ellipsis,
+                color = Color.White
             )
 
             Spacer(modifier = Modifier.height(2.dp))
 
             val volumeStr = VolumeConverter.formatVolume(preset.volumeMl, displayUnit)
-            Text(
-                text = "+$volumeStr",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = presetColor
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "+$volumeStr",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = presetColor
+                )
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Log",
+                    tint = presetColor.copy(alpha = 0.85f),
+                    modifier = Modifier.size(15.dp)
+                )
+            }
         }
+    }
+}
+
+fun getBlendedTileColor(presetColor: Color): Color {
+    val r = (0x14 * (1f - 0.28f) + (presetColor.red * 255f) * 0.28f).toInt().coerceIn(0, 255)
+    val g = (0x20 * (1f - 0.28f) + (presetColor.green * 255f) * 0.28f).toInt().coerceIn(0, 255)
+    val b = (0x2E * (1f - 0.28f) + (presetColor.blue * 255f) * 0.28f).toInt().coerceIn(0, 255)
+    return Color(r, g, b)
+}
+
+fun parseHexColor(hex: String): Color {
+    return try {
+        val clean = hex.removePrefix("#")
+        Color(android.graphics.Color.parseColor("#$clean"))
+    } catch (_: Exception) {
+        FillmarkCyan
     }
 }
 

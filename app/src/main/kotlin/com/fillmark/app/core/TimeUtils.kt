@@ -14,6 +14,12 @@ object TimeUtils {
     private val SHORT_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)
     private val MONTH_DAY_FORMATTER = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
+    fun formatCurrentDateHeader(zoneId: ZoneId = ZoneId.systemDefault()): String {
+        val date = LocalDate.now(zoneId)
+        val monthDay = date.format(MONTH_DAY_FORMATTER)
+        return "Today, $monthDay"
+    }
+
     fun currentDateIso(zoneId: ZoneId = ZoneId.systemDefault()): String {
         return LocalDate.now(zoneId).format(ISO_DATE_FORMATTER)
     }
