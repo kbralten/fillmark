@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Mug Body -->
+    <path
+        android:fillColor="#00796B"
+        android:pathData="M4,4 L18,4 L18,17 A4,4 0 0,1 14,21 L8,21 A4,4 0 0,1 4,17 Z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineJoin="round"
+        android:pathData="M4,4 L18,4 L18,17 A4,4 0 0,1 14,21 L8,21 A4,4 0 0,1 4,17 Z" />
+    <!-- Mug Handle -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:pathData="M18,7 C21,7 22,9 22,12 C22,15 21,17 18,17" />
+    <!-- Coffee liquid fill -->
+    <path
+        android:fillColor="#FFB74D"
+        android:pathData="M6,10 L16,10 L16,16 A2,2 0 0,1 14,18 L8,18 A2,2 0 0,1 6,16 Z" />
+</vector>

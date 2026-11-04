@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="280dp"
+    android:minHeight="55dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:minResizeWidth="200dp"
+    android:minResizeHeight="50dp"
+    android:resizeMode="horizontal"
+    android:updatePeriodMillis="1800000"
+    android:previewImage="@drawable/widget_preview_quick_log"
+    android:description="@string/widget_quick_log_bar_description"
+    android:initialLayout="@android:layout/list_content" />

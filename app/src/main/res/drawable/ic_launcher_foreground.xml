@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Water bottle group rotated 20 degrees to the side -->
+    <group
+        android:name="bottle_tilted"
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-20">
+
+        <!-- Subtle drop shadow behind bottle -->
+        <group
+            android:translateX="2"
+            android:translateY="3">
+            <path
+                android:pathData="M44,22 L64,22 L64,30 L69,36 L69,82 A7,7 0 0,1 62,89 L46,89 A7,7 0 0,1 39,82 L39,36 L44,30 Z"
+                android:fillColor="#33000000" />
+        </group>
+
+        <!-- Bottle Cap -->
+        <path
+            android:pathData="M46,14 L62,14 A3,3 0 0,1 65,17 L65,22 L43,22 L43,17 A3,3 0 0,1 46,14 Z"
+            android:fillColor="#E0F7FA" />
+        <path
+            android:pathData="M49,11 L59,11 A2,2 0 0,1 61,13 L61,14 L47,14 L47,13 A2,2 0 0,1 49,11 Z"
+            android:fillColor="#B2EBF2" />
+
+        <!-- Cap strap / loop -->
+        <path
+            android:pathData="M65,18 C71,18 73,26 67,28"
+            android:strokeColor="#80DEEA"
+            android:strokeWidth="2"
+            android:strokeLineCap="round" />
+
+        <!-- Bottle Neck Ring -->
+        <path
+            android:pathData="M44,22 L64,22 L64,26 L44,26 Z"
+            android:fillColor="#B2EBF2" />
+
+        <!-- Bottle Body (Glass/Translucent Shell) -->
+        <path
+            android:pathData="M44,26 L64,26 L68,34 L68,81 A7,7 0 0,1 61,88 L47,88 A7,7 0 0,1 40,81 L40,34 Z"
+            android:fillColor="#4DFFFFFF" />
+
+        <!-- Water liquid fill inside bottle -->
+        <path
+            android:pathData="M40,52 C45,50 50,54 54,52 C58,50 63,53 68,51 L68,81 A7,7 0 0,1 61,88 L47,88 A7,7 0 0,1 40,81 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:startX="54"
+                    android:startY="50"
+                    android:endX="54"
+                    android:endY="88"
+                    android:type="linear">
+                    <item android:color="#4DD0E1" android:offset="0.0" />
+                    <item android:color="#00BCD4" android:offset="0.5" />
+                    <item android:color="#0288D1" android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Measurement Fillmarks on the bottle side -->
+        <path
+            android:pathData="M44,40 L49,40 M44,46 L47,46 M44,52 L50,52 M44,58 L47,58 M44,64 L50,64 M44,70 L47,70 M44,76 L49,76"
+            android:strokeColor="#CCFFFFFF"
+            android:strokeWidth="1.6"
+            android:strokeLineCap="round" />
+
+        <!-- Glass reflection highlight stripe on right -->
+        <path
+            android:pathData="M63,35 L64,35 L64,83 L63,83 Z"
+            android:fillColor="#80FFFFFF" />
+
+        <!-- Bottle Outer Outline -->
+        <path
+            android:pathData="M44,26 L64,26 L68,34 L68,81 A7,7 0 0,1 61,88 L47,88 A7,7 0 0,1 40,81 L40,34 Z"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.2"
+            android:strokeLineJoin="round" />
+
+        <!-- Water droplets pouring / floating near the cap -->
+        <path
+            android:pathData="M37,20 C37,18 40,15 40,15 C40,15 43,18 43,20 A3,3 0 0,1 37,20 Z"
+            android:fillColor="#80DEEA" />
+        <path
+            android:pathData="M33,30 C33,28 35,26 35,26 C35,26 37,28 37,30 A2,2 0 0,1 33,30 Z"
+            android:fillColor="#4DD0E1" />
+    </group>
+
+</vector>

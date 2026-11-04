@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="280dp"
+    android:height="70dp"
+    android:viewportWidth="280"
+    android:viewportHeight="70">
+    <!-- Background Card -->
+    <path
+        android:fillColor="#1B262C"
+        android:pathData="M12,0 L268,0 A12,12 0 0,1 280,12 L280,58 A12,12 0 0,1 268,70 L12,70 A12,12 0 0,1 0,58 L0,12 A12,12 0 0,1 12,0 Z" />
+
+    <!-- Preset Item 1 -->
+    <path
+        android:fillColor="#233540"
+        android:pathData="M10,8 L72,8 A8,8 0 0,1 80,16 L80,54 A8,8 0 0,1 72,62 L10,62 A8,8 0 0,1 2,54 L2,16 A8,8 0 0,1 10,8 Z" />
+    <path
+        android:fillColor="#4DD0E1"
+        android:pathData="M36,18 L46,18 L45,28 L37,28 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,36 L58,36 L58,42 L24,42 Z" />
+    <path
+        android:fillColor="#87CFF9"
+        android:pathData="M28,47 L54,47 L54,52 L28,52 Z" />
+
+    <!-- Preset Item 2 -->
+    <path
+        android:fillColor="#233540"
+        android:pathData="M78,8 L140,8 A8,8 0 0,1 148,16 L148,54 A8,8 0 0,1 140,62 L78,62 A8,8 0 0,1 70,54 L70,16 A8,8 0 0,1 78,8 Z" />
+    <path
+        android:fillColor="#FFB74D"
+        android:pathData="M104,18 L114,18 L114,28 L104,28 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M90,36 L128,36 L128,42 L90,42 Z" />
+    <path
+        android:fillColor="#87CFF9"
+        android:pathData="M94,47 L124,47 L124,52 L94,52 Z" />
+
+    <!-- Preset Item 3 -->
+    <path
+        android:fillColor="#233540"
+        android:pathData="M146,8 L208,8 A8,8 0 0,1 216,16 L216,54 A8,8 0 0,1 208,62 L146,62 A8,8 0 0,1 138,54 L138,16 A8,8 0 0,1 146,8 Z" />
+    <path
+        android:fillColor="#4DD0E1"
+        android:pathData="M172,16 L182,16 L182,28 L172,28 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M158,36 L196,36 L196,42 L158,42 Z" />
+    <path
+        android:fillColor="#87CFF9"
+        android:pathData="M162,47 L192,47 L192,52 L162,52 Z" />
+
+    <!-- Preset Item 4 -->
+    <path
+        android:fillColor="#233540"
+        android:pathData="M214,8 L270,8 A8,8 0 0,1 278,16 L278,54 A8,8 0 0,1 270,62 L214,62 A8,8 0 0,1 206,54 L206,16 A8,8 0 0,1 214,8 Z" />
+    <path
+        android:fillColor="#80DEEA"
+        android:pathData="M237,16 L247,16 L246,28 L238,28 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M222,36 L262,36 L262,42 L222,42 Z" />
+    <path
+        android:fillColor="#87CFF9"
+        android:pathData="M226,47 L258,47 L258,52 L226,52 Z" />
+</vector>
+

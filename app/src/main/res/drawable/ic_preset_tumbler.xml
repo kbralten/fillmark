@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Straw -->
+    <path
+        android:strokeColor="#FF80AB"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M16,1 L14,5 L12,10" />
+    <!-- Tumbler Lid -->
+    <path
+        android:fillColor="#80DEEA"
+        android:pathData="M5,5 L19,5 L18,7 L6,7 Z" />
+    <!-- Tumbler Cup -->
+    <path
+        android:fillColor="#00796B"
+        android:pathData="M6,7 L18,7 L16,21 A1.5,1.5 0 0,1 14.5,22.5 L9.5,22.5 A1.5,1.5 0 0,1 8,21 Z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineJoin="round"
+        android:pathData="M6,7 L18,7 L16,21 A1.5,1.5 0 0,1 14.5,22.5 L9.5,22.5 A1.5,1.5 0 0,1 8,21 Z" />
+</vector>
