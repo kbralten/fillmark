@@ -49,16 +49,18 @@ fun BarChart(
         val barSpacing = (chartWidth / barCount) * 0.25f
         val barWidth = (chartWidth / barCount) - barSpacing
 
-        // Draw target line
+        // Draw target line only if target is set and > 0
         val avgTarget = bars.map { it.targetMl }.average()
-        val targetY = chartHeight - ((avgTarget / maxVolume).toFloat() * chartHeight)
-        drawLine(
-            color = targetLineColor,
-            start = Offset(0f, targetY),
-            end = Offset(chartWidth, targetY),
-            strokeWidth = 2.dp.toPx(),
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
-        )
+        if (avgTarget > 0) {
+            val targetY = chartHeight - ((avgTarget / maxVolume).toFloat() * chartHeight)
+            drawLine(
+                color = targetLineColor,
+                start = Offset(0f, targetY),
+                end = Offset(chartWidth, targetY),
+                strokeWidth = 2.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
+            )
+        }
 
         bars.forEachIndexed { index, bar ->
             val left = index * (barWidth + barSpacing) + (barSpacing / 2f)

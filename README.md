@@ -1,8 +1,8 @@
 # Fillmark 💧
 
-A lightweight, local-first, privacy-respecting hydration tracker for Android.
+A lightweight, local-first, privacy-respecting drink and water tracker for Android.
 
-Fillmark is designed to make fluid tracking effortless and friction-free. With one-tap logging, customizable drink presets, home screen widgets, adaptive waking-hours pacing, and seamless Health Connect sync, Fillmark helps you hit your daily hydration goals without sign-ups, subscriptions, or cloud trackers.
+Fillmark is designed to make drink tracking effortless and friction-free. With one-tap logging, customizable drink presets, home screen widgets, adaptive waking-hours pacing, and seamless Health Connect sync, Fillmark helps you hit your daily drinking goals without sign-ups, subscriptions, or cloud trackers.
 
 ---
 
@@ -21,15 +21,15 @@ Fillmark is designed to make fluid tracking effortless and friction-free. With o
 
 ### 💧 Fast & Flexible Logging
 - **One-Tap Presets:** Instantly record drinks using preset containers (e.g., Glass, Coffee Mug, Water Bottle, Can, Tumbler).
-- **Custom Presets:** Tailor presets with custom labels, container icons, fluid volumes, and hydration coefficients.
-- **Hydration Coefficients:** Account for beverages with different hydration properties (e.g., water vs. coffee or tea).
+- **Custom Presets:** Tailor presets with custom labels, container icons, fluid volumes, drink categories, and colors.
+- **Drink Water Factors:** Account for beverages with different water retention properties (e.g., water vs. coffee or tea).
 - **Manual Logging:** Floating action button allows quick logging of arbitrary amounts, beverage types, and custom timestamps.
 - **Instant Undo:** 4-second quick undo snackbar prevents accidental entries.
 
 ### ⏱️ Daily Dashboard & Waking Hours Pacing
-- **Real-Time Progress:** High-contrast progress meter displaying daily intake against your target.
-- **Adaptive Pacing Meter:** Calculates where your hydration level should be at any point in the day based on your wake-up and bedtime schedule, highlighting whether you are *ahead*, *on track*, or *behind*.
-- **Historical Target Preservation:** Adjusting today's hydration target never alters past targets or historical compliance records.
+- **Real-Time Progress:** High-contrast progress meter displaying daily intake against your target (or standalone consumption if no target is set).
+- **Adaptive Pacing Meter:** Calculates where your drinking level should be at any point in the day based on your wake-up and bedtime schedule, highlighting whether you are *ahead*, *on track*, or *behind*.
+- **Historical Target Preservation:** Adjusting today's target never alters past targets or historical compliance records.
 
 ### 📱 Android Home Screen Widgets
 Powered by Jetpack Glance, Fillmark provides three interactive home screen widgets:

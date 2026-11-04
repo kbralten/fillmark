@@ -37,5 +37,14 @@ class TimeUtilsTest {
         assertEquals(8, time.hour)
         assertEquals(45, time.minute)
     }
+
+    @Test
+    fun testFormatTimeString() {
+        val morning = TimeUtils.formatTimeString("07:00")
+        assertEquals("7:00 AM", morning)
+
+        val night = TimeUtils.formatTimeString("23:00")
+        assertEquals("11:00 PM", night)
+    }
 }
 

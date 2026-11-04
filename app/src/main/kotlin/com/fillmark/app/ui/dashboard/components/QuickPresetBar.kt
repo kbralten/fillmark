@@ -1,5 +1,6 @@
 package com.fillmark.app.ui.dashboard.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -45,6 +46,7 @@ fun QuickPresetBar(
     displayUnit: DisplayUnit,
     onPresetClick: (PresetEntity) -> Unit,
     onEditPreset: (PresetEntity) -> Unit,
+    onCustomizePresets: () -> Unit,
     onAddPreset: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -62,7 +64,7 @@ fun QuickPresetBar(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            TextButton(onClick = onAddPreset) {
+            TextButton(onClick = onCustomizePresets) {
                 Icon(
                     imageVector = Icons.Default.Tune,
                     contentDescription = "Customize presets",
@@ -135,11 +137,14 @@ private fun PresetCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val presetColor = parseHexColor(preset.colorHex)
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
         ),
+        border = BorderStroke(1.dp, presetColor.copy(alpha = 0.3f)),
         modifier = Modifier
             .width(108.dp)
             .clip(RoundedCornerShape(16.dp))
@@ -155,14 +160,15 @@ private fun PresetCard(
             val iconRes = PresetIcon.getDrawableRes(preset.iconKey)
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = presetColor.copy(alpha = 0.18f),
+                border = BorderStroke(1.dp, presetColor.copy(alpha = 0.5f)),
                 modifier = Modifier.size(42.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         painter = painterResource(id = iconRes),
                         contentDescription = preset.label,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = presetColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -184,7 +190,8 @@ private fun PresetCard(
             Text(
                 text = "+$volumeStr",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
+                fontWeight = FontWeight.SemiBold,
+                color = presetColor
             )
         }
     }

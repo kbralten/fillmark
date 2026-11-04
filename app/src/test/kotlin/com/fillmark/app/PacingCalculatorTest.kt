@@ -81,6 +81,32 @@ class PacingCalculatorTest {
     }
 
     @Test
+    fun testPacingOver100Percent() {
+        // Target is 2000ml, actual is 2500ml (125%)
+        val result = PacingCalculator.evaluatePacing(
+            currentTime = LocalTime.of(20, 0),
+            wakeTimeString = "07:00",
+            sleepTimeString = "23:00",
+            currentVolumeMl = 2500.0,
+            dailyTargetMl = 2000.0
+        )
+        assertEquals(125f, result.actualProgressPercent, 0.01f)
+        assertEquals(PacingStatus.AHEAD, result.status)
+    }
+
+    @Test
+    fun testPacingNoTarget() {
+        val result = PacingCalculator.evaluatePacing(
+            currentTime = LocalTime.of(15, 0),
+            wakeTimeString = "07:00",
+            sleepTimeString = "23:00",
+            currentVolumeMl = 1500.0,
+            dailyTargetMl = 0.0
+        )
+        assertEquals(0f, result.actualProgressPercent, 0.01f)
+    }
+
+    @Test
     fun testTimeUtilsFriendlyDate() {
         val now = System.currentTimeMillis()
         val iso = com.fillmark.app.core.TimeUtils.toIsoDate(now)

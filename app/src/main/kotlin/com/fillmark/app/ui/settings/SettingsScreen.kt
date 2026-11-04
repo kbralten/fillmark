@@ -1,7 +1,10 @@
 package com.fillmark.app.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,18 +12,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,9 +48,11 @@ import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.core.DisplayUnit
+import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.sync.HealthConnectManager
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
@@ -57,14 +72,17 @@ fun SettingsScreen(
     }
 
     var targetInput by remember(uiState.defaultTargetMl, uiState.displayUnit) {
-        mutableStateOf(VolumeConverter.formatNumberOnly(uiState.defaultTargetMl, uiState.displayUnit))
+        mutableStateOf(
+            if (uiState.defaultTargetMl > 0) {
+                VolumeConverter.formatNumberOnly(uiState.defaultTargetMl, uiState.displayUnit)
+            } else {
+                if (uiState.displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
+            }
+        )
     }
-    var wakeTimeInput by remember(uiState.wakingHoursStart) {
-        mutableStateOf(uiState.wakingHoursStart)
-    }
-    var sleepTimeInput by remember(uiState.wakingHoursEnd) {
-        mutableStateOf(uiState.wakingHoursEnd)
-    }
+
+    var showWakeTimePicker by remember { mutableStateOf(false) }
+    var showSleepTimePicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -109,22 +127,46 @@ fun SettingsScreen(
         }
 
         // Card 2: Daily Target Goal
+        val hasTarget = uiState.defaultTargetMl > 0
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Default Daily Goal",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(10.dp))
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Daily Target Goal",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (hasTarget) "Track intake towards a daily goal" else "No goal set (displays intake in big numbers)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = hasTarget,
+                        onCheckedChange = { isChecked ->
+                            if (isChecked) {
+                                val defaultVal = if (uiState.displayUnit == DisplayUnit.METRIC_ML) 2500.0 else 85.0
+                                viewModel.setDefaultTarget(defaultVal)
+                                targetInput = VolumeConverter.formatNumberOnly(defaultVal, uiState.displayUnit)
+                            } else {
+                                viewModel.setDefaultTarget(0.0)
+                            }
+                        }
+                    )
+                }
+
+                if (hasTarget) {
+                    Spacer(modifier = Modifier.height(14.dp))
                     OutlinedTextField(
                         value = targetInput,
                         onValueChange = {
@@ -137,7 +179,7 @@ fun SettingsScreen(
                         label = { Text("Daily Target") },
                         suffix = { Text(uiState.displayUnit.symbol) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -162,7 +204,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "Calculate expected hydration progress based on waking schedule",
+                            text = "Calculate expected progress based on waking schedule",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -170,7 +212,7 @@ fun SettingsScreen(
                     Switch(
                         checked = uiState.wakingPacingEnabled,
                         onCheckedChange = { isEnabled ->
-                            viewModel.setWakingSchedule(wakeTimeInput, sleepTimeInput, isEnabled)
+                            viewModel.setWakingSchedule(uiState.wakingHoursStart, uiState.wakingHoursEnd, isEnabled)
                         }
                     )
                 }
@@ -181,22 +223,16 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        OutlinedTextField(
-                            value = wakeTimeInput,
-                            onValueChange = {
-                                wakeTimeInput = it
-                                viewModel.setWakingSchedule(wakeTimeInput, sleepTimeInput, true)
-                            },
-                            label = { Text("Wake Time (HH:MM)") },
+                        TimePickerField(
+                            label = "Wake Time",
+                            timeStr = uiState.wakingHoursStart,
+                            onClick = { showWakeTimePicker = true },
                             modifier = Modifier.weight(1f)
                         )
-                        OutlinedTextField(
-                            value = sleepTimeInput,
-                            onValueChange = {
-                                sleepTimeInput = it
-                                viewModel.setWakingSchedule(wakeTimeInput, sleepTimeInput, true)
-                            },
-                            label = { Text("Sleep Time (HH:MM)") },
+                        TimePickerField(
+                            label = "Sleep Time",
+                            timeStr = uiState.wakingHoursEnd,
+                            onClick = { showSleepTimePicker = true },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -348,5 +384,121 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
     }
+
+    if (showWakeTimePicker) {
+        TimePickerModalDialog(
+            title = "Set Wake Time",
+            initialTime = uiState.wakingHoursStart,
+            onDismiss = { showWakeTimePicker = false },
+            onConfirm = { newTime ->
+                viewModel.setWakingSchedule(newTime, uiState.wakingHoursEnd, uiState.wakingPacingEnabled)
+                showWakeTimePicker = false
+            }
+        )
+    }
+
+    if (showSleepTimePicker) {
+        TimePickerModalDialog(
+            title = "Set Sleep Time",
+            initialTime = uiState.wakingHoursEnd,
+            onDismiss = { showSleepTimePicker = false },
+            onConfirm = { newTime ->
+                viewModel.setWakingSchedule(uiState.wakingHoursStart, newTime, uiState.wakingPacingEnabled)
+                showSleepTimePicker = false
+            }
+        )
+    }
+}
+
+@Composable
+fun TimePickerField(
+    label: String,
+    timeStr: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = TimeUtils.formatTimeString(timeStr),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Icon(
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = "Pick $label",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimePickerModalDialog(
+    title: String,
+    initialTime: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    val initialLocalTime = TimeUtils.parseTimeString(initialTime)
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialLocalTime.hour,
+        initialMinute = initialLocalTime.minute,
+        is24Hour = false
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                TimePicker(state = timePickerState)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val formatted = String.format(java.util.Locale.US, "%02d:%02d", timePickerState.hour, timePickerState.minute)
+                    onConfirm(formatted)
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 

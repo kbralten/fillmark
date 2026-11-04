@@ -48,9 +48,10 @@ fun FluidProgressMeter(
     pacingResult: PacingResult?,
     modifier: Modifier = Modifier
 ) {
-    val progressRatio = if (targetMl > 0) (effectiveVolumeMl / targetMl).toFloat() else 0f
+    val hasTarget = targetMl > 0
+    val progressRatio = if (hasTarget) (effectiveVolumeMl / targetMl).toFloat() else 0f
     val animatedProgress by animateFloatAsState(
-        targetValue = progressRatio.coerceIn(0f, 1f),
+        targetValue = progressRatio.coerceIn(0f, 2f),
         animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
         label = "ProgressAnimation"
     )
@@ -65,6 +66,7 @@ fun FluidProgressMeter(
     val primaryColor = MaterialTheme.colorScheme.primary
     val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     val paceMarkerColor = MaterialTheme.colorScheme.tertiary
+    val overflowColor = MaterialTheme.colorScheme.tertiary
 
     Column(
         modifier = modifier,
@@ -90,37 +92,53 @@ fun FluidProgressMeter(
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
-                // Foreground progress arc
-                val sweep = animatedProgress * 270f
-                if (sweep > 0) {
-                    drawArc(
-                        color = primaryColor,
-                        startAngle = 135f,
-                        sweepAngle = sweep,
-                        useCenter = false,
-                        topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
-                        size = Size(radius * 2, radius * 2),
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                    )
-                }
+                if (hasTarget) {
+                    // Base progress arc (up to 100%)
+                    val baseSweep = animatedProgress.coerceAtMost(1f) * 270f
+                    if (baseSweep > 0) {
+                        drawArc(
+                            color = primaryColor,
+                            startAngle = 135f,
+                            sweepAngle = baseSweep,
+                            useCenter = false,
+                            topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                            size = Size(radius * 2, radius * 2),
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                        )
+                    }
 
-                // Waking hours expected pace marker
-                if (pacingResult != null) {
-                    val paceAngle = 135f + (animatedPacing * 270f)
-                    val rad = Math.toRadians(paceAngle.toDouble())
-                    val markerX = centerOffset.x + radius * cos(rad).toFloat()
-                    val markerY = centerOffset.y + radius * sin(rad).toFloat()
+                    // Overflow progress arc for > 100% consumption
+                    if (animatedProgress > 1f) {
+                        val overflowSweep = (animatedProgress - 1f).coerceIn(0f, 1f) * 270f
+                        drawArc(
+                            color = overflowColor,
+                            startAngle = 135f,
+                            sweepAngle = overflowSweep,
+                            useCenter = false,
+                            topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                            size = Size(radius * 2, radius * 2),
+                            style = Stroke(width = strokeWidth + 2.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
 
-                    drawCircle(
-                        color = paceMarkerColor,
-                        radius = 8.dp.toPx(),
-                        center = Offset(markerX, markerY)
-                    )
-                    drawCircle(
-                        color = Color.White,
-                        radius = 4.dp.toPx(),
-                        center = Offset(markerX, markerY)
-                    )
+                    // Waking hours expected pace marker dot
+                    if (pacingResult != null) {
+                        val paceAngle = 135f + (animatedPacing * 270f)
+                        val rad = Math.toRadians(paceAngle.toDouble())
+                        val markerX = centerOffset.x + radius * cos(rad).toFloat()
+                        val markerY = centerOffset.y + radius * sin(rad).toFloat()
+
+                        drawCircle(
+                            color = paceMarkerColor,
+                            radius = 8.dp.toPx(),
+                            center = Offset(markerX, markerY)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 4.dp.toPx(),
+                            center = Offset(markerX, markerY)
+                        )
+                    }
                 }
             }
 
@@ -129,29 +147,46 @@ fun FluidProgressMeter(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                val percent = (progressRatio * 100).roundToInt()
-                Text(
-                    text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = displayUnit.symbol,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "$percent% of ${VolumeConverter.formatVolume(targetMl, displayUnit)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (hasTarget) {
+                    val percent = (progressRatio * 100).roundToInt()
+                    Text(
+                        text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = displayUnit.symbol,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$percent% of ${VolumeConverter.formatVolume(targetMl, displayUnit)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (percent >= 100) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (percent >= 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    // No target set: Show consumption in big numbers
+                    Text(
+                        text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = displayUnit.symbol,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
 
         // Pacing Feedback Pill
-        if (pacingResult != null) {
+        if (hasTarget && pacingResult != null) {
             Spacer(modifier = Modifier.height(12.dp))
             val (pillBg, pillTextColor) = when (pacingResult.status) {
                 PacingStatus.AHEAD -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer

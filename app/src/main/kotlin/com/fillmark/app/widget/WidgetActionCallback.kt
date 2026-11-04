@@ -36,7 +36,7 @@ class QuickLogActionCallback : ActionCallback {
             timestamp = System.currentTimeMillis(),
             volumeMl = preset.volumeMl,
             hydrationFactor = preset.hydrationFactor,
-            drinkType = "WATER",
+            drinkType = preset.drinkType,
             iconKey = preset.iconKey,
             lastModified = System.currentTimeMillis()
         )

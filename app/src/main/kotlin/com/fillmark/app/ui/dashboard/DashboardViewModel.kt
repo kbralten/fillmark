@@ -36,7 +36,8 @@ data class DashboardUiState(
     val lastLoggedRecord: HydrationRecordEntity? = null,
     val snackbarMessage: String? = null,
     val editingPreset: PresetEntity? = null,
-    val isPresetEditorOpen: Boolean = false
+    val isPresetEditorOpen: Boolean = false,
+    val isCustomizePresetsOpen: Boolean = false
 )
 
 class DashboardViewModel @JvmOverloads constructor(
@@ -56,7 +57,7 @@ class DashboardViewModel @JvmOverloads constructor(
                 repository.observePresets(),
                 repository.preferencesFlow
             ) { summary, presets, prefs ->
-                val pacing = if (prefs.wakingPacingEnabled) {
+                val pacing = if (prefs.wakingPacingEnabled && summary.targetMl > 0) {
                     PacingCalculator.evaluatePacing(
                         currentTime = LocalTime.now(),
                         wakeTimeString = prefs.wakingHoursStart,
@@ -146,6 +147,21 @@ class DashboardViewModel @JvmOverloads constructor(
 
     fun openAddPreset() {
         _uiState.update { it.copy(isPresetEditorOpen = true, editingPreset = null) }
+    }
+
+    fun openCustomizePresets() {
+        _uiState.update { it.copy(isCustomizePresetsOpen = true) }
+    }
+
+    fun dismissCustomizePresets() {
+        _uiState.update { it.copy(isCustomizePresetsOpen = false) }
+    }
+
+    fun reorderPresets(orderedPresets: List<PresetEntity>) {
+        viewModelScope.launch {
+            repository.reorderPresets(orderedPresets)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+        }
     }
 
     fun openEditPreset(preset: PresetEntity) {

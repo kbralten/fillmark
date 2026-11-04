@@ -29,6 +29,9 @@ interface PresetDao {
     @Update
     suspend fun updatePreset(preset: PresetEntity)
 
+    @Update
+    suspend fun updatePresets(presets: List<PresetEntity>)
+
     @Delete
     suspend fun deletePreset(preset: PresetEntity)
 

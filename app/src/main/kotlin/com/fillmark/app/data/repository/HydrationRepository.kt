@@ -45,6 +45,13 @@ class HydrationRepository(
 
     suspend fun updatePreset(preset: PresetEntity) = presetDao.updatePreset(preset)
 
+    suspend fun reorderPresets(orderedPresets: List<PresetEntity>) {
+        val updated = orderedPresets.mapIndexed { index, preset ->
+            preset.copy(displayOrder = index)
+        }
+        presetDao.updatePresets(updated)
+    }
+
     suspend fun deletePreset(id: String) = presetDao.deletePresetById(id)
 
     /**
@@ -97,7 +104,7 @@ class HydrationRepository(
             timestamp = System.currentTimeMillis(),
             volumeMl = preset.volumeMl,
             hydrationFactor = preset.hydrationFactor,
-            drinkType = "WATER",
+            drinkType = preset.drinkType,
             iconKey = preset.iconKey,
             lastModified = System.currentTimeMillis()
         )

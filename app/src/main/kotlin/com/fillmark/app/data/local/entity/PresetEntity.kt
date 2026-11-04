@@ -17,6 +17,10 @@ data class PresetEntity(
     @ColumnInfo(name = "hydration_factor", defaultValue = "1.0")
     val hydrationFactor: Double = 1.0,
     @ColumnInfo(name = "display_order")
-    val displayOrder: Int
+    val displayOrder: Int,
+    @ColumnInfo(name = "drink_type", defaultValue = "WATER")
+    val drinkType: String = "WATER",
+    @ColumnInfo(name = "color_hex")
+    val colorHex: String? = null
 )
 

@@ -67,7 +67,11 @@ class SettingsViewModel @JvmOverloads constructor(
 
     fun setDefaultTarget(targetInCurrentUnit: Double) {
         viewModelScope.launch {
-            val internalMl = VolumeConverter.toInternalMl(targetInCurrentUnit, _uiState.value.displayUnit)
+            val internalMl = if (targetInCurrentUnit > 0) {
+                VolumeConverter.toInternalMl(targetInCurrentUnit, _uiState.value.displayUnit)
+            } else {
+                0.0
+            }
             preferencesRepository.updateDefaultDailyTargetMl(internalMl)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
         }

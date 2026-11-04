@@ -43,7 +43,7 @@ fun AnalyticsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Hydration Analytics",
+            text = "Drink Analytics",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
@@ -82,11 +82,13 @@ fun AnalyticsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        text = "-- Target Line",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    if (uiState.bars.any { it.targetMl > 0 }) {
+                        Text(
+                            text = "-- Target Line",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -117,14 +119,15 @@ fun AnalyticsScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val successRate = if (uiState.totalDays > 0) {
+            val hasTarget = uiState.bars.any { it.targetMl > 0 }
+            val successRate = if (hasTarget && uiState.totalDays > 0) {
                 ((uiState.daysGoalMet.toFloat() / uiState.totalDays.toFloat()) * 100).roundToInt()
             } else 0
 
             MetricCard(
                 title = "Goal Hit Rate",
-                value = "$successRate%",
-                subtitle = "${uiState.daysGoalMet} of ${uiState.totalDays} days",
+                value = if (hasTarget) "$successRate%" else "No target",
+                subtitle = if (hasTarget) "${uiState.daysGoalMet} of ${uiState.totalDays} days" else "Goal disabled",
                 modifier = Modifier.weight(1f)
             )
 

@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Fillmark</string>
-    <string name="widget_progress_meter_description">Fillmark hydration progress meter</string>
-    <string name="widget_quick_log_bar_description">Fillmark quick hydration log presets</string>
-    <string name="widget_full_dashboard_description">Fillmark full hydration progress and presets</string>
-    <string name="health_connect_rationale">Fillmark uses Health Connect to sync your hydration logs bidirectionally with other health apps while maintaining local privacy.</string>
+    <string name="widget_progress_meter_description">Fillmark water progress meter</string>
+    <string name="widget_quick_log_bar_description">Fillmark quick drink log presets</string>
+    <string name="widget_full_dashboard_description">Fillmark full drink progress and presets</string>
+    <string name="health_connect_rationale">Fillmark uses Health Connect to sync your drink logs bidirectionally with other health apps while maintaining local privacy.</string>
 </resources>

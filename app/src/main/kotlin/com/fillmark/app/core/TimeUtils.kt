@@ -57,5 +57,9 @@ object TimeUtils {
         val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
         return LocalTime.of(hour.coerceIn(0, 23), minute.coerceIn(0, 59))
     }
+
+    fun formatTimeString(timeStr: String): String {
+        return parseTimeString(timeStr).format(TIME_FORMATTER)
+    }
 }
 

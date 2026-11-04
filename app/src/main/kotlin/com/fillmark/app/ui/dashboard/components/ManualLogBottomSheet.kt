@@ -71,7 +71,7 @@ fun ManualLogBottomSheet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Log Hydration",
+                text = "Log Drink",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -137,7 +137,7 @@ fun ManualLogBottomSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Hydration Factor: ${selectedDrinkType.defaultHydrationFactor}x",
+                        text = "Water Factor: ${selectedDrinkType.defaultHydrationFactor}x",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

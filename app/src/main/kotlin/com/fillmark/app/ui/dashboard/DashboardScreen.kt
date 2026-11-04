@@ -43,8 +43,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
+import com.fillmark.app.ui.dashboard.components.CustomizePresetsDialog
 import com.fillmark.app.ui.dashboard.components.FluidProgressMeter
 import com.fillmark.app.ui.dashboard.components.ManualLogBottomSheet
+import com.fillmark.app.ui.dashboard.components.PresetEditorDialog
 import com.fillmark.app.ui.dashboard.components.QuickPresetBar
 import com.fillmark.app.ui.dashboard.components.getPresetVector
 
@@ -117,6 +119,7 @@ fun DashboardScreen(
                     displayUnit = uiState.displayUnit,
                     onPresetClick = { preset -> viewModel.logPreset(preset) },
                     onEditPreset = { preset -> viewModel.openEditPreset(preset) },
+                    onCustomizePresets = { viewModel.openCustomizePresets() },
                     onAddPreset = { viewModel.openAddPreset() }
                 )
             }
@@ -187,8 +190,20 @@ fun DashboardScreen(
             )
         }
 
+        if (uiState.isCustomizePresetsOpen) {
+            CustomizePresetsDialog(
+                presets = uiState.presets,
+                displayUnit = uiState.displayUnit,
+                onDismiss = { viewModel.dismissCustomizePresets() },
+                onAddPreset = { viewModel.openAddPreset() },
+                onEditPreset = { preset -> viewModel.openEditPreset(preset) },
+                onDeletePreset = { id -> viewModel.deletePreset(id) },
+                onReorderPresets = { updated -> viewModel.reorderPresets(updated) }
+            )
+        }
+
         if (uiState.isPresetEditorOpen) {
-            com.fillmark.app.ui.dashboard.components.PresetEditorDialog(
+            PresetEditorDialog(
                 preset = uiState.editingPreset,
                 displayUnit = uiState.displayUnit,
                 onDismiss = { viewModel.dismissPresetEditor() },

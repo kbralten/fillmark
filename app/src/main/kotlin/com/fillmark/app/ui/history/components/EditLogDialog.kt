@@ -45,7 +45,7 @@ fun EditLogDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Edit Hydration Entry",
+                text = "Edit Drink Entry",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
