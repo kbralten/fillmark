@@ -36,6 +36,7 @@ captures/
 # Keystores & signing keys
 *.jks
 *.keystore
+!app/debug.keystore
 
 # Log files & crash dumps
 *.log

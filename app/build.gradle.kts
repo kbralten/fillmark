@@ -5,21 +5,37 @@ plugins {
   alias(libs.plugins.ksp)
 }
 
+val buildNumber = providers.gradleProperty("versionCode").map { it.toInt() }.getOrElse(1)
+val versionNameProp = providers.gradleProperty("versionName").getOrElse("1.0.$buildNumber")
+
 android {
   namespace = "com.fillmark.app"
   compileSdk = 36
+
+  signingConfigs {
+    getByName("debug") {
+      storeFile = file("debug.keystore")
+      storePassword = "android"
+      keyAlias = "androiddebugkey"
+      keyPassword = "android"
+    }
+  }
+
   defaultConfig {
     applicationId = "ca.bralten.fillmark"
     minSdk = 29
     targetSdk = 35
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = buildNumber
+    versionName = versionNameProp
   }
 
   buildTypes {
     release {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+    }
+    debug {
+      signingConfig = signingConfigs.getByName("debug")
     }
   }
   compileOptions {
