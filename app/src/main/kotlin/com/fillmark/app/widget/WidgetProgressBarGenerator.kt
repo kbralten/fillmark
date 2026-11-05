@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
 
@@ -32,20 +33,26 @@ object WidgetProgressBarGenerator {
         val cornerRadius = barHeight / 2f
 
         // 1. Background Track (Deep midnight navy pill)
+        val trackPath = Path().apply {
+            addRoundRect(
+                RectF(0f, barTop, widthPx.toFloat(), barTop + barHeight),
+                cornerRadius,
+                cornerRadius,
+                Path.Direction.CW
+            )
+        }
         val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#0C2438")
         }
-        canvas.drawRoundRect(
-            RectF(0f, barTop, widthPx.toFloat(), barTop + barHeight),
-            cornerRadius,
-            cornerRadius,
-            trackPaint
-        )
+        canvas.drawPath(trackPath, trackPaint)
 
-        // 2. Base Progress Fill (Luminous Cyan Capsule with inner glow)
-        val baseFillWidth = (widthPx * progress.coerceIn(0f, 1f)).coerceAtLeast(0f)
+        val safeProgress = if (progress.isNaN()) 0f else progress
+
+        // 2. Base Progress Fill & Overflow inside track bounds
+        val baseFillWidth = (widthPx * safeProgress.coerceIn(0f, 1f)).coerceAtLeast(0f)
         if (baseFillWidth > 0f) {
-            val fillRadius = cornerRadius.coerceAtMost(baseFillWidth / 2f)
+            canvas.save()
+            canvas.clipPath(trackPath)
 
             // Outer cyan fill gradient
             val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -59,8 +66,8 @@ object WidgetProgressBarGenerator {
             }
             canvas.drawRoundRect(
                 RectF(0f, barTop, baseFillWidth, barTop + barHeight),
-                fillRadius,
-                fillRadius,
+                cornerRadius,
+                cornerRadius,
                 fillPaint
             )
 
@@ -82,28 +89,30 @@ object WidgetProgressBarGenerator {
                     highlightPaint
                 )
             }
-        }
 
-        // 3. Overflow Fill for > 100% consumption
-        if (progress > 1f) {
-            val overflowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = LinearGradient(
-                    0f, barTop,
-                    widthPx.toFloat(), barTop + barHeight,
-                    android.graphics.Color.parseColor("#64FFDA"),
-                    android.graphics.Color.parseColor("#00E5FF"),
-                    Shader.TileMode.CLAMP
-                )
+            // 3. Overflow Fill for > 100% consumption
+            if (safeProgress > 1f) {
+                val overflowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = LinearGradient(
+                        0f, barTop,
+                        widthPx.toFloat(), barTop + barHeight,
+                        android.graphics.Color.parseColor("#64FFDA"),
+                        android.graphics.Color.parseColor("#00E5FF"),
+                        Shader.TileMode.CLAMP
+                    )
+                }
+                val overflowWidth = (widthPx * (safeProgress - 1f).coerceIn(0f, 1f)).coerceAtLeast(0f)
+                if (overflowWidth > 0) {
+                    canvas.drawRoundRect(
+                        RectF(0f, barTop, overflowWidth, barTop + barHeight),
+                        cornerRadius,
+                        cornerRadius,
+                        overflowPaint
+                    )
+                }
             }
-            val overflowWidth = (widthPx * (progress - 1f).coerceIn(0f, 1f)).coerceAtLeast(0f)
-            if (overflowWidth > 0) {
-                canvas.drawRoundRect(
-                    RectF(0f, barTop, overflowWidth, barTop + barHeight),
-                    cornerRadius,
-                    cornerRadius,
-                    overflowPaint
-                )
-            }
+
+            canvas.restore()
         }
 
         // 4. Glowing Pacing Marker (Vertical line + glowing orange dot)

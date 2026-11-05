@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -12,11 +13,13 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.LocalSize
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -24,6 +27,7 @@ import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
@@ -48,32 +52,50 @@ import com.fillmark.app.domain.PacingCalculator
 import com.fillmark.app.domain.PacingResult
 import com.fillmark.app.domain.PacingStatus
 import com.fillmark.app.ui.dashboard.components.parseHexColor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.math.roundToInt
 
 class FullDashboardWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val database = FillmarkDatabase.getInstance(context)
         val prefsRepo = UserPreferencesRepository(context)
 
         val today = LocalDate.now()
-        val startMillis = TimeUtils.startOfDayMillis(today)
-        val endMillis = TimeUtils.endOfDayMillis(today)
-        val dateIso = TimeUtils.currentDateIso()
+        val initialStartMillis = TimeUtils.startOfDayMillis(today)
+        val initialEndMillis = TimeUtils.endOfDayMillis(today)
+        val initialDateIso = TimeUtils.currentDateIso()
 
-        val initialRecords = database.hydrationDao().getRecordsBetween(startMillis, endMillis)
-        val initialTarget = database.dailyTargetDao().getTargetForDate(dateIso)
+        val initialRecords = database.hydrationDao().getRecordsBetween(initialStartMillis, initialEndMillis)
+        val initialTarget = database.dailyTargetDao().getTargetForDate(initialDateIso)
         val initialPrefs = prefsRepo.preferencesFlow.first()
         val initialPresets = database.presetDao().getAllPresets()
 
         provideContent {
-            val todayRecords by remember {
-                database.hydrationDao().observeRecordsBetween(startMillis, endMillis)
-            }.collectAsState(initial = initialRecords)
+            val currentDate by produceState(initialValue = LocalDate.now()) {
+                while (true) {
+                    val now = LocalDate.now()
+                    if (value != now) {
+                        value = now
+                    }
+                    val millisUntilNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L)
+                    delay(millisUntilNextMinute.coerceAtLeast(1_000L))
+                }
+            }
 
-            val targetEntity by remember {
+            val startMillis = TimeUtils.startOfDayMillis(currentDate)
+            val endMillis = TimeUtils.endOfDayMillis(currentDate)
+            val dateIso = currentDate.toString()
+
+            val todayRecords by remember(startMillis, endMillis) {
+                database.hydrationDao().observeRecordsBetween(startMillis, endMillis)
+            }.collectAsState(initial = if (startMillis == initialStartMillis) initialRecords else emptyList())
+
+            val targetEntity by remember(dateIso) {
                 database.dailyTargetDao().observeTargetForDate(dateIso)
             }.collectAsState(initial = initialTarget)
 
@@ -84,6 +106,13 @@ class FullDashboardWidget : GlanceAppWidget() {
             val presets by remember {
                 database.presetDao().observeAllPresets()
             }.collectAsState(initial = initialPresets)
+
+            val size = LocalSize.current
+            val barWidthDp = if (size.width > 30.dp) {
+                (size.width - 28.dp).value.toInt().coerceAtLeast(100)
+            } else {
+                280
+            }
 
             val effectiveTotalMl = todayRecords.sumOf { it.effectiveVolumeMl }
             val targetMl = targetEntity?.targetMl ?: prefs.defaultDailyTargetMl
@@ -105,13 +134,13 @@ class FullDashboardWidget : GlanceAppWidget() {
             }
 
             val paceRatio = if (pacing != null) (pacing.targetPacingPercent / 100f) else null
-            val progressBitmap = remember(rawRatio, paceRatio) {
+            val progressBitmap = remember(rawRatio, paceRatio, barWidthDp) {
                 WidgetProgressBarGenerator.createProgressBarBitmap(
                     context = context,
                     progress = rawRatio,
                     paceRatio = paceRatio,
-                    widthDp = 280,
-                    heightDp = 20
+                    widthDp = barWidthDp,
+                    heightDp = 18
                 )
             }
 
@@ -181,6 +210,7 @@ class FullDashboardWidget : GlanceAppWidget() {
                 Image(
                     provider = ImageProvider(progressBitmap),
                     contentDescription = "Progress: $percentDisplay%",
+                    contentScale = ContentScale.FillBounds,
                     modifier = GlanceModifier.fillMaxWidth().height(18.dp)
                 )
 

@@ -65,6 +65,9 @@ class QuickLogActionCallback : ActionCallback {
             }
         }
 
+        // Reschedule midnight alarm to be sure
+        MidnightAlarmScheduler.scheduleMidnightReset(context)
+
         // Immediately update this widget instance directly (Item 9)
         runCatching { FullDashboardWidget().update(context, glanceId) }
         runCatching { ProgressMeterWidget().update(context, glanceId) }
