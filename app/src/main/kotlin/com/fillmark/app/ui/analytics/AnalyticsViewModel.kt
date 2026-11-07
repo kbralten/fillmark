@@ -5,8 +5,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
+import com.fillmark.app.data.local.UserPreferences
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.data.repository.HydrationRepository
+import com.fillmark.app.domain.DailyGraphCalculator
+import com.fillmark.app.domain.DailyGraphMode
+import com.fillmark.app.domain.DailyLineChartData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,8 +40,10 @@ data class ChartBarData(
 
 data class AnalyticsUiState(
     val selectedInterval: AnalyticsInterval = AnalyticsInterval.WEEK,
+    val dailyGraphMode: DailyGraphMode = DailyGraphMode.CUMULATIVE,
     val displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
     val bars: List<ChartBarData> = emptyList(),
+    val dailyLineChartData: DailyLineChartData = DailyLineChartData(),
     val totalVolumeMl: Double = 0.0,
     val averageDailyVolumeMl: Double = 0.0,
     val daysGoalMet: Int = 0,
@@ -54,15 +60,23 @@ class AnalyticsViewModel @JvmOverloads constructor(
 
     private var allRecords: List<HydrationRecordEntity> = emptyList()
     private var defaultTargetMl: Double = 2500.0
+    private var todayTargetMl: Double = 2500.0
+    private var userPreferences: UserPreferences = UserPreferences()
 
     init {
+        val zoneId = ZoneId.systemDefault()
+        val todayIso = TimeUtils.currentDateIso(zoneId)
+
         viewModelScope.launch {
             combine(
                 repository.observeAllRecords(),
-                repository.preferencesFlow
-            ) { records, prefs ->
+                repository.preferencesFlow,
+                repository.observeTargetForDate(todayIso)
+            ) { records, prefs, dayTarget ->
                 allRecords = records
+                userPreferences = prefs
                 defaultTargetMl = prefs.defaultDailyTargetMl
+                todayTargetMl = dayTarget
                 _uiState.update { it.copy(displayUnit = prefs.displayUnit) }
                 calculateAnalytics(_uiState.value.selectedInterval)
             }.collect {}
@@ -74,46 +88,36 @@ class AnalyticsViewModel @JvmOverloads constructor(
         calculateAnalytics(interval)
     }
 
+    fun selectDailyGraphMode(mode: DailyGraphMode) {
+        _uiState.update { it.copy(dailyGraphMode = mode) }
+        calculateAnalytics(_uiState.value.selectedInterval)
+    }
+
     private fun calculateAnalytics(interval: AnalyticsInterval) {
         val zoneId = ZoneId.systemDefault()
         val today = LocalDate.now(zoneId)
 
         when (interval) {
             AnalyticsInterval.DAY -> {
-                // 24 hours breakdown for today
-                val startOfDay = TimeUtils.startOfDayMillis(today, zoneId)
-                val endOfDay = TimeUtils.endOfDayMillis(today, zoneId)
-                val todayRecords = allRecords.filter { it.timestamp in startOfDay..endOfDay }
+                val dayChartData = DailyGraphCalculator.calculate(
+                    records = allRecords,
+                    date = today,
+                    zoneId = zoneId,
+                    targetMl = todayTargetMl,
+                    wakingHoursStart = userPreferences.wakingHoursStart,
+                    wakingHoursEnd = userPreferences.wakingHoursEnd,
+                    wakingPacingEnabled = userPreferences.wakingPacingEnabled,
+                    displayUnit = userPreferences.displayUnit,
+                    mode = _uiState.value.dailyGraphMode
+                )
 
-                val bars = (0..23).map { hour ->
-                    val hourRecords = todayRecords.filter {
-                        val localHour = Instant.ofEpochMilli(it.timestamp).atZone(zoneId).hour
-                        localHour == hour
-                    }
-                    val effective = hourRecords.sumOf { it.effectiveVolumeMl }
-                    val label = when (hour) {
-                        0 -> "12a"
-                        6 -> "6a"
-                        12 -> "12p"
-                        18 -> "6p"
-                        23 -> "11p"
-                        else -> ""
-                    }
-                    ChartBarData(
-                        label = label,
-                        valueMl = effective,
-                        targetMl = defaultTargetMl / 24.0,
-                        isCurrent = hour == Instant.now().atZone(zoneId).hour
-                    )
-                }
-
-                val total = todayRecords.sumOf { it.effectiveVolumeMl }
                 _uiState.update {
                     it.copy(
-                        bars = bars,
-                        totalVolumeMl = total,
-                        averageDailyVolumeMl = total,
-                        daysGoalMet = if (total >= defaultTargetMl) 1 else 0,
+                        bars = emptyList(),
+                        dailyLineChartData = dayChartData,
+                        totalVolumeMl = dayChartData.totalIntakeMl,
+                        averageDailyVolumeMl = dayChartData.totalIntakeMl,
+                        daysGoalMet = if (dayChartData.hasTarget && dayChartData.totalIntakeMl >= dayChartData.targetVolumeMl) 1 else 0,
                         totalDays = 1
                     )
                 }

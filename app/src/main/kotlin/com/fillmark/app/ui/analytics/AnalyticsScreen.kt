@@ -1,7 +1,10 @@
 package com.fillmark.app.ui.analytics
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,29 +26,31 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.core.VolumeConverter
+import com.fillmark.app.domain.DailyGraphMode
 import com.fillmark.app.ui.analytics.components.BarChart
+import com.fillmark.app.ui.analytics.components.DailyLineChart
 import com.fillmark.app.ui.theme.FillmarkCardBorder
+import com.fillmark.app.ui.theme.FillmarkCyan
+import com.fillmark.app.ui.theme.FillmarkNavy700
 import com.fillmark.app.ui.theme.FillmarkNavy800
+import com.fillmark.app.ui.theme.FillmarkNavy900
 import com.fillmark.app.ui.theme.FillmarkNavyTitle
 import com.fillmark.app.ui.theme.FillmarkSlateMuted
 import kotlin.math.roundToInt
-
-import androidx.compose.material3.SecondaryTabRow
 
 @Composable
 fun AnalyticsScreen(
@@ -113,16 +118,33 @@ fun AnalyticsScreen(
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
                     )
-                    Text(
-                        text = "-- Target Line",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF8CA3BA)
-                    )
+
+                    if (uiState.selectedInterval == AnalyticsInterval.DAY) {
+                        DailyModeSelector(
+                            selectedMode = uiState.dailyGraphMode,
+                            onModeSelected = { viewModel.selectDailyGraphMode(it) }
+                        )
+                    } else {
+                        Text(
+                            text = "-- Target Line",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF8CA3BA)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                BarChart(bars = uiState.bars)
+                if (uiState.selectedInterval == AnalyticsInterval.DAY) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    DailyGraphLegend(
+                        mode = uiState.dailyGraphMode,
+                        hasTarget = uiState.dailyLineChartData.hasTarget
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    DailyLineChart(data = uiState.dailyLineChartData)
+                } else {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    BarChart(bars = uiState.bars)
+                }
             }
         }
 
@@ -132,7 +154,7 @@ fun AnalyticsScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             MetricCard(
-                title = "Daily Average",
+                title = if (uiState.selectedInterval == AnalyticsInterval.DAY) "Today's Intake" else "Daily Average",
                 value = VolumeConverter.formatVolume(uiState.averageDailyVolumeMl, uiState.displayUnit),
                 icon = Icons.Outlined.CalendarToday,
                 modifier = Modifier.weight(1f)
@@ -150,7 +172,11 @@ fun AnalyticsScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val hasTarget = uiState.bars.any { it.targetMl > 0 }
+            val hasTarget = if (uiState.selectedInterval == AnalyticsInterval.DAY) {
+                uiState.dailyLineChartData.hasTarget
+            } else {
+                uiState.bars.any { it.targetMl > 0 }
+            }
             val successRate = if (hasTarget && uiState.totalDays > 0) {
                 ((uiState.daysGoalMet.toFloat() / uiState.totalDays.toFloat()) * 100).roundToInt()
             } else 0
@@ -229,6 +255,127 @@ private fun MetricCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = FillmarkSlateMuted
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyModeSelector(
+    selectedMode: DailyGraphMode,
+    onModeSelected: (DailyGraphMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .background(FillmarkNavy700, RoundedCornerShape(12.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        DailyGraphMode.entries.forEach { mode ->
+            val isSelected = mode == selectedMode
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (isSelected) FillmarkCyan else Color.Transparent)
+                    .clickable { onModeSelected(mode) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = mode.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) FillmarkNavy900 else FillmarkSlateMuted
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyGraphLegend(
+    mode: DailyGraphMode,
+    hasTarget: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Line indicator for intake/rate
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 12.dp, height = 3.dp)
+                    .background(FillmarkCyan, RoundedCornerShape(1.5.dp))
+            )
+            Text(
+                text = if (mode == DailyGraphMode.CUMULATIVE) "Intake" else "Rate",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFCAD7E2)
+            )
+        }
+
+        if (hasTarget) {
+            if (mode == DailyGraphMode.CUMULATIVE) {
+                // Target line
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "--",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF8CA3BA)
+                    )
+                    Text(
+                        text = "Target",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF8CA3BA)
+                    )
+                }
+
+                // Target Pace
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "··",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF38BDF8)
+                    )
+                    Text(
+                        text = "Target Pace",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF38BDF8)
+                    )
+                }
+            } else {
+                // Rate Target Line
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "--",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF8CA3BA)
+                    )
+                    Text(
+                        text = "Target Rate",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF8CA3BA)
+                    )
+                }
             }
         }
     }
