@@ -146,6 +146,8 @@ class HydrationRepository(
         }
     }
 
+    fun observeAllTargets(): Flow<List<DailyTargetEntity>> = targetDao.observeAllTargets()
+
     suspend fun setTargetForDate(dateIso: String, targetMl: Double) {
         targetDao.upsertTarget(DailyTargetEntity(dateString = dateIso, targetMl = targetMl))
     }

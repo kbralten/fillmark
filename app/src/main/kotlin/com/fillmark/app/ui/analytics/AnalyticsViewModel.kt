@@ -41,6 +41,8 @@ data class ChartBarData(
 data class AnalyticsUiState(
     val selectedInterval: AnalyticsInterval = AnalyticsInterval.WEEK,
     val dailyGraphMode: DailyGraphMode = DailyGraphMode.CUMULATIVE,
+    val periodOffset: Int = 0,
+    val periodLabel: String = "",
     val displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
     val bars: List<ChartBarData> = emptyList(),
     val dailyLineChartData: DailyLineChartData = DailyLineChartData(),
@@ -60,50 +62,127 @@ class AnalyticsViewModel @JvmOverloads constructor(
 
     private var allRecords: List<HydrationRecordEntity> = emptyList()
     private var defaultTargetMl: Double = 2500.0
-    private var todayTargetMl: Double = 2500.0
+    private var allTargetsMap: Map<String, Double> = emptyMap()
     private var userPreferences: UserPreferences = UserPreferences()
 
     init {
-        val zoneId = ZoneId.systemDefault()
-        val todayIso = TimeUtils.currentDateIso(zoneId)
-
         viewModelScope.launch {
             combine(
                 repository.observeAllRecords(),
                 repository.preferencesFlow,
-                repository.observeTargetForDate(todayIso)
-            ) { records, prefs, dayTarget ->
+                repository.observeAllTargets()
+            ) { records, prefs, targetsList ->
                 allRecords = records
                 userPreferences = prefs
                 defaultTargetMl = prefs.defaultDailyTargetMl
-                todayTargetMl = dayTarget
+                allTargetsMap = targetsList.associate { it.dateString to it.targetMl }
                 _uiState.update { it.copy(displayUnit = prefs.displayUnit) }
-                calculateAnalytics(_uiState.value.selectedInterval)
+                calculateAnalytics(_uiState.value.selectedInterval, _uiState.value.periodOffset)
             }.collect {}
         }
     }
 
     fun selectInterval(interval: AnalyticsInterval) {
-        _uiState.update { it.copy(selectedInterval = interval) }
-        calculateAnalytics(interval)
+        _uiState.update { it.copy(selectedInterval = interval, periodOffset = 0) }
+        calculateAnalytics(interval, 0)
     }
 
     fun selectDailyGraphMode(mode: DailyGraphMode) {
         _uiState.update { it.copy(dailyGraphMode = mode) }
-        calculateAnalytics(_uiState.value.selectedInterval)
+        calculateAnalytics(_uiState.value.selectedInterval, _uiState.value.periodOffset)
     }
 
-    private fun calculateAnalytics(interval: AnalyticsInterval) {
+    fun previousPeriod() {
+        val newOffset = _uiState.value.periodOffset + 1
+        _uiState.update { it.copy(periodOffset = newOffset) }
+        calculateAnalytics(_uiState.value.selectedInterval, newOffset)
+    }
+
+    fun nextPeriod() {
+        val currentOffset = _uiState.value.periodOffset
+        if (currentOffset > 0) {
+            val newOffset = currentOffset - 1
+            _uiState.update { it.copy(periodOffset = newOffset) }
+            calculateAnalytics(_uiState.value.selectedInterval, newOffset)
+        }
+    }
+
+    fun resetPeriodOffset() {
+        if (_uiState.value.periodOffset != 0) {
+            _uiState.update { it.copy(periodOffset = 0) }
+            calculateAnalytics(_uiState.value.selectedInterval, 0)
+        }
+    }
+
+    private fun formatPeriodLabel(
+        interval: AnalyticsInterval,
+        offset: Int,
+        today: LocalDate
+    ): String {
+        val monthDayFormat = DateTimeFormatter.ofPattern("MMM d", Locale.US)
+        return when (interval) {
+            AnalyticsInterval.DAY -> {
+                val date = today.minusDays(offset.toLong())
+                when (offset) {
+                    0 -> "Today (${date.format(monthDayFormat)})"
+                    1 -> "Yesterday (${date.format(monthDayFormat)})"
+                    else -> date.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US))
+                }
+            }
+            AnalyticsInterval.WEEK -> {
+                val end = today.minusDays((offset * 7).toLong())
+                val start = end.minusDays(6)
+                when (offset) {
+                    0 -> "This Week (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
+                    1 -> "Last Week (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
+                    else -> "${start.format(monthDayFormat)} – ${end.format(monthDayFormat)}"
+                }
+            }
+            AnalyticsInterval.MONTH -> {
+                val end = today.minusDays((offset * 30).toLong())
+                val start = end.minusDays(29)
+                when (offset) {
+                    0 -> "Past 30 Days (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
+                    else -> "${start.format(monthDayFormat)} – ${end.format(monthDayFormat)}"
+                }
+            }
+            AnalyticsInterval.THREE_MONTHS -> {
+                val end = today.minusDays((offset * 12 * 7).toLong())
+                val start = end.minusDays((12 * 7 - 1).toLong())
+                val yearFormat = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+                when (offset) {
+                    0 -> "Past 12 Weeks (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
+                    else -> "${start.format(yearFormat)} – ${end.format(yearFormat)}"
+                }
+            }
+            AnalyticsInterval.YEAR -> {
+                val end = today.minusDays((offset * 52 * 7).toLong())
+                val start = end.minusDays((52 * 7 - 1).toLong())
+                val yearMonthFormat = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
+                when (offset) {
+                    0 -> "Past 52 Weeks (${start.format(yearMonthFormat)} – ${end.format(yearMonthFormat)})"
+                    else -> "${start.format(yearMonthFormat)} – ${end.format(yearMonthFormat)}"
+                }
+            }
+        }
+    }
+
+    private fun calculateAnalytics(interval: AnalyticsInterval, offset: Int = _uiState.value.periodOffset) {
         val zoneId = ZoneId.systemDefault()
         val today = LocalDate.now(zoneId)
+        val periodLabel = formatPeriodLabel(interval, offset, today)
 
         when (interval) {
             AnalyticsInterval.DAY -> {
+                val targetDate = today.minusDays(offset.toLong())
+                val targetDateIso = targetDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                val targetMlForDay = allTargetsMap[targetDateIso] ?: defaultTargetMl
+
                 val dayChartData = DailyGraphCalculator.calculate(
                     records = allRecords,
-                    date = today,
+                    date = targetDate,
                     zoneId = zoneId,
-                    targetMl = todayTargetMl,
+                    targetMl = targetMlForDay,
                     wakingHoursStart = userPreferences.wakingHoursStart,
                     wakingHoursEnd = userPreferences.wakingHoursEnd,
                     wakingPacingEnabled = userPreferences.wakingPacingEnabled,
@@ -113,6 +192,8 @@ class AnalyticsViewModel @JvmOverloads constructor(
 
                 _uiState.update {
                     it.copy(
+                        periodOffset = offset,
+                        periodLabel = periodLabel,
                         bars = emptyList(),
                         dailyLineChartData = dayChartData,
                         totalVolumeMl = dayChartData.totalIntakeMl,
@@ -124,27 +205,31 @@ class AnalyticsViewModel @JvmOverloads constructor(
             }
 
             AnalyticsInterval.WEEK -> {
-                // Past 7 days
+                // 7 days ending at today.minusDays(offset * 7)
+                val endOfWeek = today.minusDays((offset * 7).toLong())
                 val bars = (6 downTo 0).map { daysAgo ->
-                    val date = today.minusDays(daysAgo.toLong())
+                    val date = endOfWeek.minusDays(daysAgo.toLong())
                     val dateIso = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     val start = TimeUtils.startOfDayMillis(date, zoneId)
                     val end = TimeUtils.endOfDayMillis(date, zoneId)
                     val dayRecords = allRecords.filter { it.timestamp in start..end }
                     val effective = dayRecords.sumOf { it.effectiveVolumeMl }
+                    val dayTarget = allTargetsMap[dateIso] ?: defaultTargetMl
 
                     ChartBarData(
                         label = date.format(DateTimeFormatter.ofPattern("EEE", Locale.US)),
                         valueMl = effective,
-                        targetMl = defaultTargetMl,
-                        isCurrent = daysAgo == 0
+                        targetMl = dayTarget,
+                        isCurrent = (offset == 0 && daysAgo == 0)
                     )
                 }
 
                 val total = bars.sumOf { it.valueMl }
-                val met = bars.count { it.valueMl >= it.targetMl }
+                val met = bars.count { it.targetMl > 0 && it.valueMl >= it.targetMl }
                 _uiState.update {
                     it.copy(
+                        periodOffset = offset,
+                        periodLabel = periodLabel,
                         bars = bars,
                         totalVolumeMl = total,
                         averageDailyVolumeMl = total / 7.0,
@@ -155,27 +240,32 @@ class AnalyticsViewModel @JvmOverloads constructor(
             }
 
             AnalyticsInterval.MONTH -> {
-                // Past 30 days
+                // 30 days ending at today.minusDays(offset * 30)
+                val endOfMonth = today.minusDays((offset * 30).toLong())
                 val bars = (29 downTo 0).map { daysAgo ->
-                    val date = today.minusDays(daysAgo.toLong())
+                    val date = endOfMonth.minusDays(daysAgo.toLong())
+                    val dateIso = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     val start = TimeUtils.startOfDayMillis(date, zoneId)
                     val end = TimeUtils.endOfDayMillis(date, zoneId)
                     val dayRecords = allRecords.filter { it.timestamp in start..end }
                     val effective = dayRecords.sumOf { it.effectiveVolumeMl }
                     val label = if (daysAgo % 5 == 0) date.format(DateTimeFormatter.ofPattern("d", Locale.US)) else ""
+                    val dayTarget = allTargetsMap[dateIso] ?: defaultTargetMl
 
                     ChartBarData(
                         label = label,
                         valueMl = effective,
-                        targetMl = defaultTargetMl,
-                        isCurrent = daysAgo == 0
+                        targetMl = dayTarget,
+                        isCurrent = (offset == 0 && daysAgo == 0)
                     )
                 }
 
                 val total = bars.sumOf { it.valueMl }
-                val met = bars.count { it.valueMl >= it.targetMl }
+                val met = bars.count { it.targetMl > 0 && it.valueMl >= it.targetMl }
                 _uiState.update {
                     it.copy(
+                        periodOffset = offset,
+                        periodLabel = periodLabel,
                         bars = bars,
                         totalVolumeMl = total,
                         averageDailyVolumeMl = total / 30.0,
@@ -186,10 +276,10 @@ class AnalyticsViewModel @JvmOverloads constructor(
             }
 
             AnalyticsInterval.THREE_MONTHS, AnalyticsInterval.YEAR -> {
-                // Weekly aggregates over 12 weeks
                 val numWeeks = if (interval == AnalyticsInterval.THREE_MONTHS) 12 else 52
+                val endOfPeriod = today.minusDays((offset * numWeeks * 7).toLong())
                 val bars = (numWeeks - 1 downTo 0).map { weeksAgo ->
-                    val end = today.minusDays((weeksAgo * 7).toLong())
+                    val end = endOfPeriod.minusDays((weeksAgo * 7).toLong())
                     val start = end.minusDays(6)
                     val startMs = TimeUtils.startOfDayMillis(start, zoneId)
                     val endMs = TimeUtils.endOfDayMillis(end, zoneId)
@@ -198,16 +288,18 @@ class AnalyticsViewModel @JvmOverloads constructor(
 
                     ChartBarData(
                         label = if (weeksAgo % 4 == 0) start.format(DateTimeFormatter.ofPattern("MMM", Locale.US)) else "",
-                        valueMl = effective / 7.0, // daily average for that week
+                        valueMl = effective / 7.0,
                         targetMl = defaultTargetMl,
-                        isCurrent = weeksAgo == 0
+                        isCurrent = (offset == 0 && weeksAgo == 0)
                     )
                 }
 
                 val total = bars.sumOf { it.valueMl * 7.0 }
-                val met = bars.count { it.valueMl >= it.targetMl }
+                val met = bars.count { it.targetMl > 0 && it.valueMl >= it.targetMl }
                 _uiState.update {
                     it.copy(
+                        periodOffset = offset,
+                        periodLabel = periodLabel,
                         bars = bars,
                         totalVolumeMl = total,
                         averageDailyVolumeMl = bars.map { b -> b.valueMl }.average().takeIf { !it.isNaN() } ?: 0.0,

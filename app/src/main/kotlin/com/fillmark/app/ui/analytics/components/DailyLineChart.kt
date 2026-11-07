@@ -1,7 +1,6 @@
 package com.fillmark.app.ui.analytics.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -67,31 +66,6 @@ fun DailyLineChart(
                             val closest = data.points.minByOrNull { abs(it.hourOfDay - touchedHour) }
                             selectedPoint = if (selectedPoint == closest) null else closest
                         }
-                    }
-                )
-            }
-            .pointerInput(data) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val paddingStart = 20.dp.toPx()
-                        val paddingEnd = 20.dp.toPx()
-                        val plotWidth = size.width - paddingStart - paddingEnd
-                        if (plotWidth > 0 && data.points.isNotEmpty()) {
-                            val touchedHour = ((offset.x - paddingStart) / plotWidth * 24f).coerceIn(0f, 24f)
-                            selectedPoint = data.points.minByOrNull { abs(it.hourOfDay - touchedHour) }
-                        }
-                    },
-                    onDrag = { change, _ ->
-                        val paddingStart = 20.dp.toPx()
-                        val paddingEnd = 20.dp.toPx()
-                        val plotWidth = size.width - paddingStart - paddingEnd
-                        if (plotWidth > 0 && data.points.isNotEmpty()) {
-                            val touchedHour = ((change.position.x - paddingStart) / plotWidth * 24f).coerceIn(0f, 24f)
-                            selectedPoint = data.points.minByOrNull { abs(it.hourOfDay - touchedHour) }
-                        }
-                    },
-                    onDragEnd = {
-                        // Keep selected or let it stay until tap
                     }
                 )
             }

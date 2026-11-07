@@ -1,8 +1,15 @@
 package com.fillmark.app.ui.analytics
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,13 +25,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
@@ -36,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +57,7 @@ import com.fillmark.app.ui.analytics.components.BarChart
 import com.fillmark.app.ui.analytics.components.DailyLineChart
 import com.fillmark.app.ui.theme.FillmarkCardBorder
 import com.fillmark.app.ui.theme.FillmarkCyan
+import com.fillmark.app.ui.theme.FillmarkCyanDark
 import com.fillmark.app.ui.theme.FillmarkNavy700
 import com.fillmark.app.ui.theme.FillmarkNavy800
 import com.fillmark.app.ui.theme.FillmarkNavy900
@@ -98,13 +111,42 @@ fun AnalyticsScreen(
             }
         }
 
+        // Period Navigation Bar (Previous, Next, and Jump to Current)
+        PeriodNavigationBar(
+            periodLabel = uiState.periodLabel,
+            canGoNext = uiState.periodOffset > 0,
+            showJumpToCurrent = uiState.periodOffset > 0,
+            onPrevious = { viewModel.previousPeriod() },
+            onNext = { viewModel.nextPeriod() },
+            onJumpToCurrent = { viewModel.resetPeriodOffset() }
+        )
+
         // Intake Breakdown Card
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = FillmarkNavy800
             ),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(uiState.selectedInterval, uiState.periodOffset) {
+                    var totalDragX = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { totalDragX = 0f },
+                        onDragEnd = {
+                            val threshold = 40.dp.toPx()
+                            if (totalDragX > threshold) {
+                                viewModel.previousPeriod()
+                            } else if (totalDragX < -threshold) {
+                                viewModel.nextPeriod()
+                            }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            totalDragX += dragAmount
+                        }
+                    )
+                }
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -139,11 +181,30 @@ fun AnalyticsScreen(
                         mode = uiState.dailyGraphMode,
                         hasTarget = uiState.dailyLineChartData.hasTarget
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    DailyLineChart(data = uiState.dailyLineChartData)
-                } else {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    BarChart(bars = uiState.bars)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                AnimatedContent(
+                    targetState = uiState.periodOffset,
+                    transitionSpec = {
+                        if (targetState > initialState) {
+                            (slideInHorizontally { -it } + fadeIn()).togetherWith(
+                                slideOutHorizontally { it } + fadeOut()
+                            )
+                        } else {
+                            (slideInHorizontally { it } + fadeIn()).togetherWith(
+                                slideOutHorizontally { -it } + fadeOut()
+                            )
+                        }
+                    },
+                    label = "PeriodChartTransition"
+                ) { _ ->
+                    if (uiState.selectedInterval == AnalyticsInterval.DAY) {
+                        DailyLineChart(data = uiState.dailyLineChartData)
+                    } else {
+                        BarChart(bars = uiState.bars)
+                    }
                 }
             }
         }
@@ -154,7 +215,9 @@ fun AnalyticsScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             MetricCard(
-                title = if (uiState.selectedInterval == AnalyticsInterval.DAY) "Today's Intake" else "Daily Average",
+                title = if (uiState.selectedInterval == AnalyticsInterval.DAY) {
+                    if (uiState.periodOffset == 0) "Today's Intake" else "Day's Intake"
+                } else "Daily Average",
                 value = VolumeConverter.formatVolume(uiState.averageDailyVolumeMl, uiState.displayUnit),
                 icon = Icons.Outlined.CalendarToday,
                 modifier = Modifier.weight(1f)
@@ -376,6 +439,80 @@ private fun DailyGraphLegend(
                         color = Color(0xFF8CA3BA)
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeriodNavigationBar(
+    periodLabel: String,
+    canGoNext: Boolean,
+    showJumpToCurrent: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onJumpToCurrent: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Previous period button
+        IconButton(
+            onClick = onPrevious,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.NavigateBefore,
+                contentDescription = "Previous period",
+                tint = FillmarkNavyTitle,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        // Center period label
+        Text(
+            text = periodLabel,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = FillmarkNavyTitle
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            // Little icon to jump back to the current time period
+            if (showJumpToCurrent) {
+                IconButton(
+                    onClick = onJumpToCurrent,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Today,
+                        contentDescription = "Jump to current period",
+                        tint = FillmarkCyanDark,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // Next period button
+            IconButton(
+                onClick = onNext,
+                enabled = canGoNext,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.NavigateNext,
+                    contentDescription = "Next period",
+                    tint = if (canGoNext) FillmarkNavyTitle else FillmarkSlateMuted.copy(alpha = 0.3f),
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
     }
