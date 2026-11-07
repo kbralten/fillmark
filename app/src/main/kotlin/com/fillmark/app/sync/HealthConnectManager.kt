@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HydrationRecord
+import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.units.Volume
 import com.fillmark.app.data.local.FillmarkDatabase
@@ -49,17 +50,19 @@ class HealthConnectManager(private val context: Context) {
     }
 
     /**
-     * Performs an outbound sync of all local records that have not yet been synced to Health Connect.
+     * Performs an outbound sync of all local records that have not yet been synced or were modified locally.
      */
     suspend fun syncOutbound(database: FillmarkDatabase): Int = withContext(Dispatchers.IO) {
         val client = healthConnectClient ?: return@withContext 0
         if (!hasAllPermissions()) return@withContext 0
 
-        val unsynced = database.hydrationDao().getUnsyncedRecords()
         var syncedCount = 0
 
+        // 1. Newly created unsynced records
+        val unsynced = database.hydrationDao().getUnsyncedRecords()
         for (record in unsynced) {
             try {
+                if (record.volumeMl <= 0.0) continue
                 val endTime = Instant.ofEpochMilli(record.timestamp)
                 // Health Connect enforces startTime < endTime strictly for interval records.
                 // For point-in-time hydration events, span 1 second.
@@ -76,10 +79,12 @@ class HealthConnectManager(private val context: Context) {
                 val response = client.insertRecords(listOf(hcRecord))
                 val generatedId = response.recordIdsList.firstOrNull()
                 if (generatedId != null) {
-                    database.hydrationDao().updateHealthConnectId(
+                    val now = System.currentTimeMillis()
+                    database.hydrationDao().updateHealthConnectSyncInfo(
                         id = record.id,
                         hcId = generatedId,
-                        lastModified = System.currentTimeMillis()
+                        lastSynced = now,
+                        lastModified = now
                     )
                     syncedCount++
                 }
@@ -87,7 +92,77 @@ class HealthConnectManager(private val context: Context) {
                 Log.e(TAG, "Error syncing record ${record.id} to Health Connect", e)
             }
         }
+
+        // 2. Previously synced records that have been modified locally
+        val modified = database.hydrationDao().getModifiedRecords()
+        for (record in modified) {
+            val hcId = record.healthConnectId ?: continue
+            try {
+                if (record.volumeMl <= 0.0) continue
+                val endTime = Instant.ofEpochMilli(record.timestamp)
+                val startTime = endTime.minusSeconds(1)
+                val zoneOffset = ZoneId.systemDefault().rules.getOffset(endTime)
+                val hcRecord = HydrationRecord(
+                    startTime = startTime,
+                    startZoneOffset = zoneOffset,
+                    endTime = endTime,
+                    endZoneOffset = zoneOffset,
+                    volume = Volume.milliliters(record.volumeMl),
+                    metadata = Metadata(id = hcId)
+                )
+
+                try {
+                    client.updateRecords(listOf(hcRecord))
+                    database.hydrationDao().updateLastSynced(
+                        id = record.id,
+                        lastSynced = System.currentTimeMillis()
+                    )
+                    syncedCount++
+                } catch (updateEx: Exception) {
+                    Log.w(TAG, "Update failed for record ${record.id}, attempting insert as fallback", updateEx)
+                    val newHcRecord = HydrationRecord(
+                        startTime = startTime,
+                        startZoneOffset = zoneOffset,
+                        endTime = endTime,
+                        endZoneOffset = zoneOffset,
+                        volume = Volume.milliliters(record.volumeMl)
+                    )
+                    val response = client.insertRecords(listOf(newHcRecord))
+                    val newHcId = response.recordIdsList.firstOrNull()
+                    if (newHcId != null) {
+                        val now = System.currentTimeMillis()
+                        database.hydrationDao().updateHealthConnectSyncInfo(
+                            id = record.id,
+                            hcId = newHcId,
+                            lastSynced = now,
+                            lastModified = now
+                        )
+                        syncedCount++
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating modified record ${record.id} to Health Connect", e)
+            }
+        }
+
         syncedCount
+    }
+
+    /**
+     * Deletes a record from Health Connect by its Health Connect record ID.
+     */
+    suspend fun deleteRecord(hcId: String) = withContext(Dispatchers.IO) {
+        val client = healthConnectClient ?: return@withContext
+        if (!hasAllPermissions()) return@withContext
+        try {
+            client.deleteRecords(
+                recordType = HydrationRecord::class,
+                recordIdsList = listOf(hcId),
+                clientRecordIdsList = emptyList()
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting record $hcId from Health Connect", e)
+        }
     }
 
     /**
@@ -135,7 +210,8 @@ class HealthConnectManager(private val context: Context) {
                                         drinkType = "WATER",
                                         iconKey = null,
                                         healthConnectId = hcUid,
-                                        lastModified = System.currentTimeMillis()
+                                        lastModified = System.currentTimeMillis(),
+                                        lastSynced = System.currentTimeMillis()
                                     )
                                     database.hydrationDao().insertRecord(newEntity)
                                     importedCount++

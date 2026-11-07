@@ -10,6 +10,7 @@ import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.data.local.entity.DailyTargetEntity
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.data.local.entity.PresetEntity
+import com.fillmark.app.sync.HealthConnectManager
 import com.fillmark.app.sync.HealthConnectSyncWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -119,7 +120,18 @@ class HydrationRepository(
     }
 
     suspend fun deleteRecordById(id: String) {
+        val record = hydrationDao.getRecordById(id)
         hydrationDao.deleteRecordById(id)
+        if (record?.healthConnectId != null) {
+            try {
+                val hcManager = HealthConnectManager(context)
+                if (hcManager.isAvailable() && hcManager.hasAllPermissions()) {
+                    hcManager.deleteRecord(record.healthConnectId)
+                }
+            } catch (e: Exception) {
+                // Ignore failure on HC delete
+            }
+        }
         triggerHealthConnectSync()
     }
 

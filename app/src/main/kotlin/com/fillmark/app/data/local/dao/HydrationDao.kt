@@ -47,8 +47,17 @@ interface HydrationDao {
     @Query("SELECT * FROM hydration_records WHERE health_connect_id IS NULL")
     suspend fun getUnsyncedRecords(): List<HydrationRecordEntity>
 
+    @Query("SELECT * FROM hydration_records WHERE health_connect_id IS NOT NULL AND last_modified > last_synced")
+    suspend fun getModifiedRecords(): List<HydrationRecordEntity>
+
     @Query("UPDATE hydration_records SET health_connect_id = :hcId, last_modified = :lastModified WHERE id = :id")
     suspend fun updateHealthConnectId(id: String, hcId: String, lastModified: Long = System.currentTimeMillis())
+
+    @Query("UPDATE hydration_records SET health_connect_id = :hcId, last_synced = :lastSynced, last_modified = :lastModified WHERE id = :id")
+    suspend fun updateHealthConnectSyncInfo(id: String, hcId: String, lastSynced: Long, lastModified: Long)
+
+    @Query("UPDATE hydration_records SET last_synced = :lastSynced WHERE id = :id")
+    suspend fun updateLastSynced(id: String, lastSynced: Long)
 
     @Query("SELECT SUM(volume_ml * hydration_factor) FROM hydration_records WHERE timestamp >= :startTime AND timestamp <= :endTime")
     fun observeTotalEffectiveMlBetween(startTime: Long, endTime: Long): Flow<Double?>

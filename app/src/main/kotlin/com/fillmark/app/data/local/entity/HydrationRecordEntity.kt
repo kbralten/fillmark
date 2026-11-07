@@ -28,7 +28,9 @@ data class HydrationRecordEntity(
     @ColumnInfo(name = "health_connect_id")
     val healthConnectId: String? = null,
     @ColumnInfo(name = "last_modified")
-    val lastModified: Long = System.currentTimeMillis()
+    val lastModified: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "last_synced", defaultValue = "0")
+    val lastSynced: Long = 0L
 ) {
     val effectiveVolumeMl: Double
         get() = volumeMl * hydrationFactor

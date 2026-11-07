@@ -13,6 +13,7 @@ object TimeUtils {
     private val TIME_FORMATTER = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
     private val SHORT_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)
     private val MONTH_DAY_FORMATTER = DateTimeFormatter.ofPattern("MMM d", Locale.US)
+    private val FULL_DATE_FORMATTER = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
 
     fun formatCurrentDateHeader(zoneId: ZoneId = ZoneId.systemDefault()): String {
         val date = LocalDate.now(zoneId)
@@ -29,6 +30,26 @@ object TimeUtils {
         return date.format(ISO_DATE_FORMATTER)
     }
 
+    fun toLocalDate(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): LocalDate {
+        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalDate()
+    }
+
+    fun toLocalTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): LocalTime {
+        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalTime()
+    }
+
+    fun toEpochMillis(date: LocalDate, time: LocalTime, zoneId: ZoneId = ZoneId.systemDefault()): Long {
+        return date.atTime(time).atZone(zoneId).toInstant().toEpochMilli()
+    }
+
+    fun utcMillisToLocalDate(utcMillis: Long): LocalDate {
+        return Instant.ofEpochMilli(utcMillis).atZone(ZoneId.of("UTC")).toLocalDate()
+    }
+
+    fun localDateToUtcMillis(date: LocalDate): Long {
+        return date.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+    }
+
     fun startOfDayMillis(date: LocalDate = LocalDate.now(), zoneId: ZoneId = ZoneId.systemDefault()): Long {
         return date.atStartOfDay(zoneId).toInstant().toEpochMilli()
     }
@@ -40,6 +61,26 @@ object TimeUtils {
     fun formatTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
         val time = Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalTime()
         return time.format(TIME_FORMATTER)
+    }
+
+    fun formatTime(time: LocalTime): String {
+        return time.format(TIME_FORMATTER)
+    }
+
+    fun formatFullDate(date: LocalDate): String {
+        return date.format(FULL_DATE_FORMATTER)
+    }
+
+    fun formatDateTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
+        val date = toLocalDate(epochMillis, zoneId)
+        val timeStr = formatTime(epochMillis, zoneId)
+        val today = LocalDate.now(zoneId)
+        val dateStr = when (date) {
+            today -> "Today"
+            today.minusDays(1) -> "Yesterday"
+            else -> date.format(FULL_DATE_FORMATTER)
+        }
+        return "$dateStr at $timeStr"
     }
 
     fun formatFriendlyDate(dateString: String, zoneId: ZoneId = ZoneId.systemDefault()): String {

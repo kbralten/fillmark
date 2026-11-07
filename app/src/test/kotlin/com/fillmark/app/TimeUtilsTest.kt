@@ -46,5 +46,45 @@ class TimeUtilsTest {
         val night = TimeUtils.formatTimeString("23:00")
         assertEquals("11:00 PM", night)
     }
+
+    @Test
+    fun testLocalDateAndLocalTimeConversion() {
+        val zone = ZoneId.of("America/New_York")
+        val date = LocalDate.of(2026, 11, 7)
+        val time = java.time.LocalTime.of(14, 30)
+
+        val millis = TimeUtils.toEpochMillis(date, time, zone)
+        val extractedDate = TimeUtils.toLocalDate(millis, zone)
+        val extractedTime = TimeUtils.toLocalTime(millis, zone)
+
+        assertEquals(date, extractedDate)
+        assertEquals(time, extractedTime)
+    }
+
+    @Test
+    fun testUtcMillisConversion() {
+        val date = LocalDate.of(2026, 11, 7)
+        val utcMillis = TimeUtils.localDateToUtcMillis(date)
+        val reconstructed = TimeUtils.utcMillisToLocalDate(utcMillis)
+
+        assertEquals(date, reconstructed)
+    }
+
+    @Test
+    fun testFormatDateTime() {
+        val zone = ZoneId.of("UTC")
+        val today = LocalDate.now(zone)
+        val yesterday = today.minusDays(1)
+        val pastDate = LocalDate.of(2025, 5, 12)
+        val time = java.time.LocalTime.of(15, 45)
+
+        val todayMillis = TimeUtils.toEpochMillis(today, time, zone)
+        val yesterdayMillis = TimeUtils.toEpochMillis(yesterday, time, zone)
+        val pastMillis = TimeUtils.toEpochMillis(pastDate, time, zone)
+
+        assertEquals("Today at 3:45 PM", TimeUtils.formatDateTime(todayMillis, zone))
+        assertEquals("Yesterday at 3:45 PM", TimeUtils.formatDateTime(yesterdayMillis, zone))
+        assertEquals("May 12, 2025 at 3:45 PM", TimeUtils.formatDateTime(pastMillis, zone))
+    }
 }
 

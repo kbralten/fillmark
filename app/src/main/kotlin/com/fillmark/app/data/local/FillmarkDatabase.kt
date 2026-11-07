@@ -24,7 +24,7 @@ import java.util.UUID
         PresetEntity::class,
         DailyTargetEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class FillmarkDatabase : RoomDatabase() {
@@ -43,6 +43,12 @@ abstract class FillmarkDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE hydration_records ADD COLUMN last_synced INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): FillmarkDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -51,7 +57,7 @@ abstract class FillmarkDatabase : RoomDatabase() {
                     "fillmark_database"
                 )
                     .addCallback(DatabaseCallback())
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration(false)
                     .build()
                 INSTANCE = instance

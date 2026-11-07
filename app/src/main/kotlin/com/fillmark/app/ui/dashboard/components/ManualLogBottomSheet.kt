@@ -1,10 +1,12 @@
 package com.fillmark.app.ui.dashboard.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,16 +17,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.EditCalendar
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -40,6 +48,7 @@ import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.DrinkType
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
+import com.fillmark.app.ui.common.DateTimePickerDialog
 import java.time.LocalTime
 import kotlin.math.roundToInt
 
@@ -54,6 +63,8 @@ fun ManualLogBottomSheet(
     var volumeInput by remember { mutableStateOf("250") }
     var selectedDrinkType by remember { mutableStateOf(DrinkType.WATER) }
     var timestampMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var isOverridden by remember { mutableStateOf(false) }
+    var showDateTimePicker by remember { mutableStateOf(false) }
 
     val volumeVal = volumeInput.toDoubleOrNull() ?: 0.0
     val internalMl = VolumeConverter.toInternalMl(volumeVal, displayUnit)
@@ -152,22 +163,107 @@ fun ManualLogBottomSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Timestamp display
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Timestamp display & Override Control
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (isOverridden) {
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                },
+                border = if (isOverridden) {
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f))
+                } else null,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Time of Consumption",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = TimeUtils.formatTime(timestampMillis),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isOverridden) Icons.Outlined.History else Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                tint = if (isOverridden) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isOverridden) "Overridden Time" else "Time of Consumption",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (isOverridden) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (isOverridden) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = if (isOverridden) {
+                                TimeUtils.formatDateTime(timestampMillis)
+                            } else {
+                                "Now (${TimeUtils.formatTime(timestampMillis)})"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isOverridden) {
+                            TextButton(
+                                onClick = {
+                                    timestampMillis = System.currentTimeMillis()
+                                    isOverridden = false
+                                },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "Reset to Now",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+
+                        TextButton(
+                            onClick = { showDateTimePicker = true },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.EditCalendar,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isOverridden) "Change" else "Override time/date...",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (showDateTimePicker) {
+                DateTimePickerDialog(
+                    initialTimestampMillis = timestampMillis,
+                    title = "Override Date & Time",
+                    disclaimerText = "Fillmark works best when drinks are tracked in real-time. Only override if you forgot to log a past drink.",
+                    confirmButtonText = "Set Past Time",
+                    onDismiss = { showDateTimePicker = false },
+                    onConfirm = { selectedMillis ->
+                        timestampMillis = selectedMillis
+                        isOverridden = true
+                        showDateTimePicker = false
+                    }
                 )
             }
 
