@@ -61,5 +61,30 @@ object VolumeConverter {
             }
         }
     }
+
+    /**
+     * Formats a volume number cleanly for text inputs, omitting unnecessary trailing ".0".
+     */
+    fun formatInputNumber(ml: Double, unit: DisplayUnit): String {
+        return when (unit) {
+            DisplayUnit.METRIC_ML -> "${ml.roundToInt()}"
+            DisplayUnit.IMPERIAL_FL_OZ -> {
+                val flOz = mlToFlOz(ml)
+                val formatted = String.format(Locale.US, "%.1f", flOz)
+                if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
+            }
+        }
+    }
+
+    /**
+     * Converts an entered volume string from one display unit to another, preserving clean input formatting.
+     */
+    fun convertInputVolume(volumeText: String, fromUnit: DisplayUnit, toUnit: DisplayUnit): String {
+        if (fromUnit == toUnit) return volumeText
+        val num = volumeText.toDoubleOrNull() ?: return volumeText
+        if (num <= 0.0) return volumeText
+        val internalMl = toInternalMl(num, fromUnit)
+        return formatInputNumber(internalMl, toUnit)
+    }
 }
 

@@ -49,6 +49,7 @@ import com.fillmark.app.core.DrinkType
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.ui.common.DateTimePickerDialog
+import com.fillmark.app.ui.common.UnitToggle
 import java.time.LocalTime
 import kotlin.math.roundToInt
 
@@ -60,14 +61,17 @@ fun ManualLogBottomSheet(
     onLogRecord: (volumeMl: Double, factor: Double, drinkType: String, timestamp: Long) -> Unit,
     sheetState: SheetState
 ) {
-    var volumeInput by remember { mutableStateOf("250") }
+    var selectedUnit by remember { mutableStateOf(displayUnit) }
+    var volumeInput by remember {
+        mutableStateOf(if (displayUnit == DisplayUnit.METRIC_ML) "250" else "8.5")
+    }
     var selectedDrinkType by remember { mutableStateOf(DrinkType.WATER) }
     var timestampMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var isOverridden by remember { mutableStateOf(false) }
     var showDateTimePicker by remember { mutableStateOf(false) }
 
     val volumeVal = volumeInput.toDoubleOrNull() ?: 0.0
-    val internalMl = VolumeConverter.toInternalMl(volumeVal, displayUnit)
+    val internalMl = VolumeConverter.toInternalMl(volumeVal, selectedUnit)
     val effectiveMl = internalMl * selectedDrinkType.defaultHydrationFactor
 
     ModalBottomSheet(
@@ -90,12 +94,37 @@ fun ManualLogBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Volume Section Header with Unit Toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Volume",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                UnitToggle(
+                    selectedUnit = selectedUnit,
+                    onUnitSelected = { newUnit ->
+                        if (newUnit != selectedUnit) {
+                            volumeInput = VolumeConverter.convertInputVolume(volumeInput, selectedUnit, newUnit)
+                            selectedUnit = newUnit
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Volume Input
             OutlinedTextField(
                 value = volumeInput,
                 onValueChange = { volumeInput = it.filter { char -> char.isDigit() || char == '.' } },
-                label = { Text("Volume (${displayUnit.symbol})") },
-                suffix = { Text(displayUnit.symbol) },
+                label = { Text("Volume (${selectedUnit.symbol})") },
+                suffix = { Text(selectedUnit.symbol) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
@@ -152,8 +181,13 @@ fun ManualLogBottomSheet(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    val effectiveText = if (selectedUnit != displayUnit) {
+                        "${VolumeConverter.formatVolume(effectiveMl, selectedUnit)} (${VolumeConverter.formatVolume(effectiveMl, displayUnit)})"
+                    } else {
+                        VolumeConverter.formatVolume(effectiveMl, selectedUnit)
+                    }
                     Text(
-                        text = "Effective: ${VolumeConverter.formatVolume(effectiveMl, displayUnit)}",
+                        text = "Effective: $effectiveText",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

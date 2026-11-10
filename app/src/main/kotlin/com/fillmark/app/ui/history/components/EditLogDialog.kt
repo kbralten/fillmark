@@ -42,6 +42,7 @@ import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.ui.common.DateTimePickerDialog
+import com.fillmark.app.ui.common.UnitToggle
 import com.fillmark.app.ui.theme.FillmarkCardBorder
 import com.fillmark.app.ui.theme.FillmarkCyanDark
 
@@ -52,8 +53,10 @@ fun EditLogDialog(
     onDismiss: () -> Unit,
     onSave: (HydrationRecordEntity) -> Unit
 ) {
-    val initialDisplayVal = VolumeConverter.toDisplayValue(record.volumeMl, displayUnit)
-    var volumeInput by remember { mutableStateOf(VolumeConverter.formatNumberOnly(record.volumeMl, displayUnit)) }
+    var selectedUnit by remember { mutableStateOf(displayUnit) }
+    var volumeInput by remember {
+        mutableStateOf(VolumeConverter.formatInputNumber(record.volumeMl, displayUnit))
+    }
     var selectedDrinkType by remember { mutableStateOf(DrinkType.fromId(record.drinkType)) }
     var selectedTimestamp by remember { mutableStateOf(record.timestamp) }
     var showDateTimePicker by remember { mutableStateOf(false) }
@@ -69,10 +72,35 @@ fun EditLogDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Volume",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    UnitToggle(
+                        selectedUnit = selectedUnit,
+                        onUnitSelected = { newUnit ->
+                            if (newUnit != selectedUnit) {
+                                volumeInput = VolumeConverter.convertInputVolume(volumeInput, selectedUnit, newUnit)
+                                selectedUnit = newUnit
+                            }
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = volumeInput,
                     onValueChange = { volumeInput = it.filter { char -> char.isDigit() || char == '.' } },
-                    label = { Text("Volume (${displayUnit.symbol})") },
+                    label = { Text("Volume (${selectedUnit.symbol})") },
+                    suffix = { Text(selectedUnit.symbol) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
@@ -156,7 +184,7 @@ fun EditLogDialog(
             Button(
                 onClick = {
                     val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
-                    val ml = VolumeConverter.toInternalMl(inputVal, displayUnit)
+                    val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
                     if (ml > 0) {
                         onSave(
                             record.copy(

@@ -53,6 +53,7 @@ import com.fillmark.app.core.DrinkType
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.PresetEntity
+import com.fillmark.app.ui.common.UnitToggle
 import java.util.UUID
 
 val PRESET_PALETTE = listOf(
@@ -87,11 +88,12 @@ fun PresetEditorDialog(
     onSave: (PresetEntity) -> Unit,
     onDelete: ((String) -> Unit)? = null
 ) {
+    var selectedUnit by remember { mutableStateOf(displayUnit) }
     var labelInput by remember { mutableStateOf(preset?.label ?: "Cup") }
     var volumeInput by remember {
         mutableStateOf(
             if (preset != null) {
-                VolumeConverter.formatNumberOnly(preset.volumeMl, displayUnit)
+                VolumeConverter.formatInputNumber(preset.volumeMl, displayUnit)
             } else {
                 if (displayUnit == DisplayUnit.METRIC_ML) "250" else "8.5"
             }
@@ -133,12 +135,37 @@ fun PresetEditorDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // Standard Volume Section Header with Unit Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Standard Volume",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    UnitToggle(
+                        selectedUnit = selectedUnit,
+                        onUnitSelected = { newUnit ->
+                            if (newUnit != selectedUnit) {
+                                volumeInput = VolumeConverter.convertInputVolume(volumeInput, selectedUnit, newUnit)
+                                selectedUnit = newUnit
+                            }
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 // Volume input in active unit
                 OutlinedTextField(
                     value = volumeInput,
                     onValueChange = { volumeInput = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Standard Volume (${displayUnit.symbol})") },
-                    suffix = { Text(displayUnit.symbol) },
+                    label = { Text("Standard Volume (${selectedUnit.symbol})") },
+                    suffix = { Text(selectedUnit.symbol) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
@@ -304,7 +331,7 @@ fun PresetEditorDialog(
             Button(
                 onClick = {
                     val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
-                    val ml = VolumeConverter.toInternalMl(inputVal, displayUnit)
+                    val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
                     if (labelInput.isNotBlank() && ml > 0) {
                         val updated = preset?.copy(
                             label = labelInput.trim(),

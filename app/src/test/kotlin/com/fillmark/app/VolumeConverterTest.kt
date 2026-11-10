@@ -45,5 +45,36 @@ class VolumeConverterTest {
         val mlFromImperial = VolumeConverter.toInternalMl(10.0, DisplayUnit.IMPERIAL_FL_OZ)
         assertEquals(295.735, mlFromImperial, 0.001)
     }
+
+    @Test
+    fun testFormatInputNumber() {
+        assertEquals("500", VolumeConverter.formatInputNumber(500.0, DisplayUnit.METRIC_ML))
+        assertEquals("250", VolumeConverter.formatInputNumber(250.0, DisplayUnit.METRIC_ML))
+        assertEquals("12", VolumeConverter.formatInputNumber(12.0 * VolumeConverter.ML_PER_FL_OZ, DisplayUnit.IMPERIAL_FL_OZ))
+        assertEquals("8.5", VolumeConverter.formatInputNumber(250.0, DisplayUnit.IMPERIAL_FL_OZ))
+    }
+
+    @Test
+    fun testConvertInputVolume() {
+        // ml to fl oz
+        assertEquals("8.5", VolumeConverter.convertInputVolume("250", DisplayUnit.METRIC_ML, DisplayUnit.IMPERIAL_FL_OZ))
+        assertEquals("16.9", VolumeConverter.convertInputVolume("500", DisplayUnit.METRIC_ML, DisplayUnit.IMPERIAL_FL_OZ))
+
+        // fl oz to ml
+        assertEquals("355", VolumeConverter.convertInputVolume("12", DisplayUnit.IMPERIAL_FL_OZ, DisplayUnit.METRIC_ML))
+        assertEquals("500", VolumeConverter.convertInputVolume("16.9", DisplayUnit.IMPERIAL_FL_OZ, DisplayUnit.METRIC_ML))
+
+        // round-trip 12 oz -> 355 ml -> 12 oz
+        val toMl = VolumeConverter.convertInputVolume("12", DisplayUnit.IMPERIAL_FL_OZ, DisplayUnit.METRIC_ML)
+        assertEquals("355", toMl)
+        val backToOz = VolumeConverter.convertInputVolume(toMl, DisplayUnit.METRIC_ML, DisplayUnit.IMPERIAL_FL_OZ)
+        assertEquals("12", backToOz)
+
+        // edge cases
+        assertEquals("", VolumeConverter.convertInputVolume("", DisplayUnit.METRIC_ML, DisplayUnit.IMPERIAL_FL_OZ))
+        assertEquals("0", VolumeConverter.convertInputVolume("0", DisplayUnit.METRIC_ML, DisplayUnit.IMPERIAL_FL_OZ))
+        assertEquals("abc", VolumeConverter.convertInputVolume("abc", DisplayUnit.METRIC_ML, DisplayUnit.IMPERIAL_FL_OZ))
+        assertEquals("250", VolumeConverter.convertInputVolume("250", DisplayUnit.METRIC_ML, DisplayUnit.METRIC_ML))
+    }
 }
 
