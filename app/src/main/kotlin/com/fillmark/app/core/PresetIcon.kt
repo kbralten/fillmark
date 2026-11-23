@@ -17,5 +17,14 @@ enum class PresetIcon(val id: String, val displayName: String, val drawableRes: 
         fun getDrawableRes(iconKey: String?): Int {
             return fromId(iconKey).drawableRes
         }
+
+        fun defaultForDrinkType(drinkType: DrinkType): PresetIcon {
+            return when (drinkType) {
+                DrinkType.COFFEE -> MUG
+                DrinkType.TEA -> TUMBLER
+                DrinkType.SODA -> CAN
+                else -> GLASS
+            }
+        }
     }
 }

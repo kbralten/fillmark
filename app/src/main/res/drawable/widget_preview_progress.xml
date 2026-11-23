@@ -1,36 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="200dp"
-    android:height="100dp"
+    android:height="92dp"
     android:viewportWidth="200"
-    android:viewportHeight="100">
+    android:viewportHeight="92">
     <!-- Background Card -->
     <path
-        android:fillColor="#1B262C"
-        android:pathData="M12,0 L188,0 A12,12 0 0,1 200,12 L200,88 A12,12 0 0,1 188,100 L12,100 A12,12 0 0,1 0,88 L0,12 A12,12 0 0,1 12,0 Z" />
+        android:fillColor="#182432"
+        android:pathData="M12,0 L188,0 A12,12 0 0,1 200,12 L200,80 A12,12 0 0,1 188,92 L12,92 A12,12 0 0,1 0,80 L0,12 A12,12 0 0,1 12,0 Z" />
     <!-- Header -->
     <path
-        android:fillColor="#87CFF9"
-        android:pathData="M16,18 L50,18 L50,24 L16,24 Z" />
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,14 L54,14 A2,2 0 0,1 56,16 L56,19 A2,2 0 0,1 54,21 L14,21 A2,2 0 0,1 12,19 L12,16 A2,2 0 0,1 14,14 Z" />
     <!-- Percentage -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M160,16 L184,16 L184,26 L160,26 Z" />
+        android:pathData="M162,13 L186,13 A2,2 0 0,1 188,15 L188,21 A2,2 0 0,1 186,23 L162,23 A2,2 0 0,1 160,21 L160,15 A2,2 0 0,1 162,13 Z" />
     <!-- Progress Bar Track -->
     <path
-        android:fillColor="#2A3B47"
-        android:pathData="M16,46 L184,46 A4,4 0 0,1 188,50 L188,50 A4,4 0 0,1 184,54 L16,54 A4,4 0 0,1 12,50 L12,50 A4,4 0 0,1 16,46 Z" />
+        android:fillColor="#23374A"
+        android:pathData="M17,39 L183,39 A5,5 0 0,1 188,44 L188,44 A5,5 0 0,1 183,49 L17,49 A5,5 0 0,1 12,44 L12,44 A5,5 0 0,1 17,39 Z" />
     <!-- Progress Bar Fill -->
     <path
-        android:fillColor="#0288D1"
-        android:pathData="M16,46 L110,46 A4,4 0 0,1 114,50 L114,50 A4,4 0 0,1 110,54 L16,54 A4,4 0 0,1 12,50 L12,50 A4,4 0 0,1 16,46 Z" />
-    <!-- Subtitle Text placeholder -->
+        android:fillColor="#20D2DE"
+        android:pathData="M17,39 L130,39 A5,5 0 0,1 135,44 L135,44 A5,5 0 0,1 130,49 L17,49 A5,5 0 0,1 12,44 L12,44 A5,5 0 0,1 17,39 Z" />
+    <!-- Subtitle Text -->
     <path
-        android:fillColor="#90A4AE"
-        android:pathData="M16,74 L85,74 L85,80 L16,80 Z" />
-    <!-- Status Pill placeholder -->
+        android:fillColor="#9EAFBF"
+        android:pathData="M14,67 L84,67 A2,2 0 0,1 86,69 L86,71 A2,2 0 0,1 84,73 L14,73 A2,2 0 0,1 12,71 L12,69 A2,2 0 0,1 14,67 Z" />
+    <!-- Status Pill -->
     <path
-        android:fillColor="#4DD0E1"
-        android:pathData="M120,72 L184,72 A5,5 0 0,1 189,77 L189,77 A5,5 0 0,1 184,82 L120,82 A5,5 0 0,1 115,77 L115,77 A5,5 0 0,1 120,72 Z" />
+        android:fillColor="#143B38"
+        android:pathData="M122,64 L182,64 A6,6 0 0,1 188,70 L188,70 A6,6 0 0,1 182,76 L122,76 A6,6 0 0,1 116,70 L116,70 A6,6 0 0,1 122,64 Z" />
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M124,67 A3,3 0 1,0 124,73 A3,3 0 1,0 124,67 Z" />
+    <path
+        android:fillColor="#7DE6C0"
+        android:pathData="M132,68 L180,68 L180,72 L132,72 Z" />
 </vector>
-

@@ -13,6 +13,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.actionParametersOf
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -35,6 +36,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.fillmark.app.MainActivity
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.VolumeConverter
@@ -61,9 +63,13 @@ class QuickLogBarWidget : GlanceAppWidget() {
                 prefsRepo.preferencesFlow
             }.collectAsState(initial = initialPrefs)
 
+            val canUndo = prefs.lastWidgetLogRecordId != null &&
+                (System.currentTimeMillis() - prefs.lastWidgetLogTimeMillis) <= 30_000L
+
             QuickLogBarContent(
                 presets = presets,
-                displayUnit = prefs.displayUnit
+                displayUnit = prefs.displayUnit,
+                canUndo = canUndo
             )
         }
     }
@@ -71,7 +77,8 @@ class QuickLogBarWidget : GlanceAppWidget() {
     @Composable
     private fun QuickLogBarContent(
         presets: List<PresetEntity>,
-        displayUnit: DisplayUnit
+        displayUnit: DisplayUnit,
+        canUndo: Boolean
     ) {
         Row(
             modifier = GlanceModifier
@@ -83,12 +90,19 @@ class QuickLogBarWidget : GlanceAppWidget() {
             horizontalAlignment = Alignment.Horizontal.CenterHorizontally
         ) {
             if (presets.isEmpty()) {
-                Text(
-                    text = "Tap to open Fillmark",
-                    style = TextStyle(fontSize = 12.sp, color = ColorProvider(Color.White))
-                )
+                Box(
+                    modifier = GlanceModifier
+                        .fillMaxSize()
+                        .clickable(actionStartActivity<MainActivity>()),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Tap to open Fillmark",
+                        style = TextStyle(fontSize = 12.sp, color = ColorProvider(Color.White))
+                    )
+                }
             } else {
-                val visiblePresets = presets.take(5)
+                val visiblePresets = presets.take(if (canUndo) 4 else 5)
                 for (preset in visiblePresets) {
                     val volumeStr = VolumeConverter.formatVolume(preset.volumeMl, displayUnit)
                     val iconRes = PresetIcon.getDrawableRes(preset.iconKey)
@@ -142,6 +156,26 @@ class QuickLogBarWidget : GlanceAppWidget() {
                         }
                     }
                     Spacer(modifier = GlanceModifier.width(5.dp))
+                }
+                if (canUndo) {
+                    Box(
+                        modifier = GlanceModifier
+                            .height(56.dp)
+                            .background(ColorProvider(Color(0xFF1F3B54)))
+                            .cornerRadius(14.dp)
+                            .padding(horizontal = 10.dp)
+                            .clickable(actionRunCallback<UndoWidgetLogActionCallback>()),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Undo",
+                            style = TextStyle(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorProvider(Color(0xFF34F3FF))
+                            )
+                        )
+                    }
                 }
             }
         }

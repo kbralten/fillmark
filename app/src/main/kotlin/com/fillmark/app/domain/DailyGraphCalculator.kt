@@ -29,7 +29,8 @@ data class DailyLineChartData(
     val targetRatePerHour: Double = 0.0,
     val displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
     val totalIntakeMl: Double = 0.0,
-    val hasEntries: Boolean = false
+    val hasEntries: Boolean = false,
+    val isToday: Boolean = true
 )
 
 object DailyGraphCalculator {
@@ -53,7 +54,8 @@ object DailyGraphCalculator {
         wakingHoursEnd: String,
         wakingPacingEnabled: Boolean,
         displayUnit: DisplayUnit,
-        mode: DailyGraphMode
+        mode: DailyGraphMode,
+        hydrationFactorsEnabled: Boolean = true
     ): DailyLineChartData {
         val hasTarget = targetMl > 0.0
 
@@ -83,12 +85,13 @@ object DailyGraphCalculator {
             .filter { it.timestamp in startOfDay..endOfDay }
             .sortedBy { it.timestamp }
 
-        val totalIntakeMl = dayRecords.sumOf { it.effectiveVolumeMl }
+        val totalIntakeMl = dayRecords.sumOf { it.countedVolumeMl(hydrationFactorsEnabled) }
         val hasEntries = dayRecords.isNotEmpty()
 
         // Cluster events within 5 minutes
         val clusteredEvents = mutableListOf<ClusteredDrinkEvent>()
         for (record in dayRecords) {
+            val countedVol = record.countedVolumeMl(hydrationFactorsEnabled)
             val zonedDateTime = Instant.ofEpochMilli(record.timestamp).atZone(zoneId)
             val hourOfDay = zonedDateTime.hour + zonedDateTime.minute / 60.0f + zonedDateTime.second / 3600.0f
             if (clusteredEvents.isNotEmpty() && (record.timestamp - clusteredEvents.last().timestamp) <= 5 * 60 * 1000L) {
@@ -97,7 +100,7 @@ object DailyGraphCalculator {
                     ClusteredDrinkEvent(
                         timestamp = record.timestamp,
                         hourOfDay = hourOfDay,
-                        volumeMl = last.volumeMl + record.effectiveVolumeMl
+                        volumeMl = last.volumeMl + countedVol
                     )
                 )
             } else {
@@ -105,7 +108,7 @@ object DailyGraphCalculator {
                     ClusteredDrinkEvent(
                         timestamp = record.timestamp,
                         hourOfDay = hourOfDay,
-                        volumeMl = record.effectiveVolumeMl
+                        volumeMl = countedVol
                     )
                 )
             }
@@ -201,7 +204,8 @@ object DailyGraphCalculator {
             targetRatePerHour = targetRatePerHour,
             displayUnit = displayUnit,
             totalIntakeMl = totalIntakeMl,
-            hasEntries = hasEntries
+            hasEntries = hasEntries,
+            isToday = (date == LocalDate.now(zoneId))
         )
     }
 }

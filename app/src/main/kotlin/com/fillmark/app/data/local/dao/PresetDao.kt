@@ -40,5 +40,8 @@ interface PresetDao {
 
     @Query("SELECT COUNT(*) FROM presets")
     suspend fun countPresets(): Int
+
+    @Query("DELETE FROM presets")
+    suspend fun deleteAllPresets()
 }
 

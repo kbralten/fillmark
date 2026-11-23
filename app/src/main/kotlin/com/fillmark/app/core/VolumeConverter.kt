@@ -10,6 +10,25 @@ enum class DisplayUnit(val label: String, val symbol: String) {
 
 object VolumeConverter {
     const val ML_PER_FL_OZ = 29.5735
+    const val MAX_SINGLE_DRINK_ML = 10_000.0
+    const val MAX_DAILY_TARGET_ML = 20_000.0
+
+    /**
+     * Filters raw user text to digits and at most one decimal point.
+     */
+    fun sanitizeDecimalInput(raw: String): String {
+        val sb = StringBuilder(raw.length)
+        var seenDot = false
+        for (c in raw) {
+            if (c.isDigit()) {
+                sb.append(c)
+            } else if (c == '.' && !seenDot) {
+                sb.append(c)
+                seenDot = true
+            }
+        }
+        return sb.toString()
+    }
 
     fun mlToFlOz(ml: Double): Double {
         return ml / ML_PER_FL_OZ

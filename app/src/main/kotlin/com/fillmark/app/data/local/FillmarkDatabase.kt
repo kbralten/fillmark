@@ -1,6 +1,8 @@
 package com.fillmark.app.data.local
 
+import android.content.ContentValues
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -13,9 +15,6 @@ import com.fillmark.app.data.local.dao.PresetDao
 import com.fillmark.app.data.local.entity.DailyTargetEntity
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.data.local.entity.PresetEntity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.util.UUID
 
 @Database(
@@ -25,7 +24,7 @@ import java.util.UUID
         DailyTargetEntity::class
     ],
     version = 3,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class FillmarkDatabase : RoomDatabase() {
     abstract fun hydrationDao(): HydrationDao
@@ -121,10 +120,18 @@ abstract class FillmarkDatabase : RoomDatabase() {
         private class DatabaseCallback : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                INSTANCE?.let { database ->
-                    CoroutineScope(Dispatchers.IO).launch {
-                        database.presetDao().insertPresets(DEFAULT_PRESETS)
+                DEFAULT_PRESETS.forEach { preset ->
+                    val values = ContentValues().apply {
+                        put("id", preset.id)
+                        put("label", preset.label)
+                        put("volume_ml", preset.volumeMl)
+                        put("icon_key", preset.iconKey)
+                        put("hydration_factor", preset.hydrationFactor)
+                        put("display_order", preset.displayOrder)
+                        put("drink_type", preset.drinkType)
+                        put("color_hex", preset.colorHex)
                     }
+                    db.insert("presets", SQLiteDatabase.CONFLICT_REPLACE, values)
                 }
             }
         }

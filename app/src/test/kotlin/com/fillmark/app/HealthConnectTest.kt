@@ -6,8 +6,11 @@ import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.units.Volume
+import com.fillmark.app.data.local.entity.HydrationRecordEntity
+import com.fillmark.app.sync.HealthConnectManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.Instant
 import java.time.ZoneId
@@ -130,5 +133,31 @@ class HealthConnectTest {
             timeRangeFilter = TimeRangeFilter.after(Instant.now().minus(30, ChronoUnit.DAYS))
         )
         assertNotNull(request)
+    }
+
+    @Test
+    fun testPrepareRestoredEntityForResyncClearsHcMetadata() {
+        val original = HydrationRecordEntity(
+            id = "rec-1",
+            timestamp = 1700000000000L,
+            volumeMl = 500.0,
+            hydrationFactor = 1.0,
+            drinkType = "WATER",
+            iconKey = "GLASS",
+            healthConnectId = "stale-hc-id",
+            lastModified = 1000L,
+            lastSynced = 2000L
+        )
+
+        val restored = HealthConnectManager.prepareRestoredEntityForResync(
+            record = original,
+            nowMillis = 9999L
+        )
+
+        assertNull(restored.healthConnectId)
+        assertEquals(0L, restored.lastSynced)
+        assertEquals(9999L, restored.lastModified)
+        assertEquals("rec-1", restored.id)
+        assertEquals(500.0, restored.volumeMl, 0.001)
     }
 }

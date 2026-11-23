@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -41,51 +43,58 @@ class HealthConnectRationaleActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val privacyUrl = stringResource(R.string.privacy_policy_url)
-                    Column(
+                    Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .systemBarsPadding()
-                            .verticalScroll(rememberScrollState())
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .systemBarsPadding(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Health Connect Access",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Text(
-                            text = stringResource(R.string.health_connect_rationale),
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        Button(
-                            onClick = { finish() },
-                            modifier = Modifier.fillMaxWidth()
+                        Column(
+                            modifier = Modifier
+                                .widthIn(max = 560.dp)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(24.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("Close")
-                        }
+                            Text(
+                                text = stringResource(R.string.health_connect_access_title),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                        OutlinedButton(
-                            onClick = {
-                                runCatching {
-                                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("View Privacy Policy")
+                            Text(
+                                text = stringResource(R.string.health_connect_rationale),
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+
+                            Spacer(modifier = Modifier.height(32.dp))
+
+                            Button(
+                                onClick = { finish() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.action_close))
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedButton(
+                                onClick = {
+                                    runCatching {
+                                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.view_privacy_policy))
+                            }
                         }
                     }
                 }

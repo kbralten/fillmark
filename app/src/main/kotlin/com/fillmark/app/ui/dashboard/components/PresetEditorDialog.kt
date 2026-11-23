@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,7 +32,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,9 +43,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.DrinkType
 import com.fillmark.app.core.PresetIcon
@@ -84,12 +86,14 @@ fun parseHexColor(hex: String?, fallback: Color = Color(0xFF2196F3)): Color {
 fun PresetEditorDialog(
     preset: PresetEntity?, // null if adding new preset
     displayUnit: DisplayUnit,
+    nextDisplayOrder: Int = 0,
     onDismiss: () -> Unit,
     onSave: (PresetEntity) -> Unit,
     onDelete: ((String) -> Unit)? = null
 ) {
+    val defaultPresetName = stringResource(R.string.preset_default_name)
     var selectedUnit by remember { mutableStateOf(displayUnit) }
-    var labelInput by remember { mutableStateOf(preset?.label ?: "Cup") }
+    var labelInput by remember { mutableStateOf(preset?.label ?: defaultPresetName) }
     var volumeInput by remember {
         mutableStateOf(
             if (preset != null) {
@@ -109,11 +113,29 @@ fun PresetEditorDialog(
         mutableStateOf(PresetIcon.fromId(preset?.iconKey))
     }
 
+    val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
+    val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
+    val isLabelValid = labelInput.isNotBlank()
+    val isVolumeValid = ml > 0 && ml <= VolumeConverter.MAX_SINGLE_DRINK_ML
+    val volumeErrorText = when {
+        volumeInput.isBlank() || ml <= 0 -> stringResource(R.string.error_volume_gt_zero)
+        ml > VolumeConverter.MAX_SINGLE_DRINK_ML -> stringResource(
+            R.string.error_max_single_drink,
+            VolumeConverter.formatVolume(VolumeConverter.MAX_SINGLE_DRINK_ML, selectedUnit)
+        )
+        else -> null
+    }
+    val canSave = isLabelValid && isVolumeValid
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (preset == null) "Add Quick Preset" else "Edit Preset",
+                text = if (preset == null) {
+                    stringResource(R.string.preset_add_title)
+                } else {
+                    stringResource(R.string.preset_edit_title)
+                },
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleLarge
             )
@@ -128,8 +150,12 @@ fun PresetEditorDialog(
                 OutlinedTextField(
                     value = labelInput,
                     onValueChange = { labelInput = it },
-                    label = { Text("Preset Name") },
+                    label = { Text(stringResource(R.string.preset_name_label)) },
                     singleLine = true,
+                    isError = !isLabelValid,
+                    supportingText = if (!isLabelValid) {
+                        { Text(stringResource(R.string.preset_name_error)) }
+                    } else null,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -142,7 +168,7 @@ fun PresetEditorDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Standard Volume",
+                        text = stringResource(R.string.preset_standard_volume),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -163,10 +189,12 @@ fun PresetEditorDialog(
                 // Volume input in active unit
                 OutlinedTextField(
                     value = volumeInput,
-                    onValueChange = { volumeInput = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Standard Volume (${selectedUnit.symbol})") },
+                    onValueChange = { volumeInput = VolumeConverter.sanitizeDecimalInput(it) },
+                    label = { Text(stringResource(R.string.preset_standard_volume_unit, selectedUnit.symbol)) },
                     suffix = { Text(selectedUnit.symbol) },
                     singleLine = true,
+                    isError = volumeErrorText != null,
+                    supportingText = volumeErrorText?.let { msg -> { Text(msg) } },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -175,7 +203,7 @@ fun PresetEditorDialog(
 
                 // Drink Category Selector
                 Text(
-                    text = "Drink Category",
+                    text = stringResource(R.string.drink_category_label),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -195,7 +223,6 @@ fun PresetEditorDialog(
                             selected = isSelected,
                             onClick = {
                                 selectedDrinkType = type
-                                // Suggest matching default icon/color if default
                                 when (type) {
                                     DrinkType.COFFEE -> {
                                         selectedIcon = PresetIcon.MUG
@@ -231,7 +258,7 @@ fun PresetEditorDialog(
 
                 // Color Picker
                 Text(
-                    text = "Preset Color",
+                    text = stringResource(R.string.preset_color_label),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -243,33 +270,46 @@ fun PresetEditorDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     PRESET_PALETTE.forEach { hex ->
                         val color = parseHexColor(hex)
                         val isSelected = hex.equals(selectedColorHex, ignoreCase = true)
+                        val swatchLabel = if (isSelected) {
+                            stringResource(R.string.preset_color_selected_cd)
+                        } else {
+                            stringResource(R.string.preset_color_swatch_cd, hex)
+                        }
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
-                                .background(color)
                                 .clickable { selectedColorHex = hex }
-                                .then(
-                                    if (isSelected) {
-                                        Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                    } else {
-                                        Modifier
-                                    }
-                                ),
+                                .semantics { contentDescription = swatchLabel },
                             contentAlignment = Alignment.Center
                         ) {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Selected color",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .then(
+                                        if (isSelected) {
+                                            Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                        } else {
+                                            Modifier
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -279,7 +319,7 @@ fun PresetEditorDialog(
 
                 // Icon Picker
                 Text(
-                    text = "Select Icon",
+                    text = stringResource(R.string.preset_icon_label),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -330,9 +370,7 @@ fun PresetEditorDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
-                    val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
-                    if (labelInput.isNotBlank() && ml > 0) {
+                    if (canSave) {
                         val updated = preset?.copy(
                             label = labelInput.trim(),
                             volumeMl = ml,
@@ -346,15 +384,16 @@ fun PresetEditorDialog(
                             volumeMl = ml,
                             iconKey = selectedIcon.id,
                             hydrationFactor = selectedDrinkType.defaultHydrationFactor,
-                            displayOrder = 99,
+                            displayOrder = nextDisplayOrder,
                             drinkType = selectedDrinkType.id,
                             colorHex = selectedColorHex
                         )
                         onSave(updated)
                     }
-                }
+                },
+                enabled = canSave
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
@@ -363,16 +402,15 @@ fun PresetEditorDialog(
                     IconButton(onClick = { onDelete(preset.id) }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete preset",
+                            contentDescription = stringResource(R.string.preset_delete_cd),
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
                 OutlinedButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         }
     )
 }
-

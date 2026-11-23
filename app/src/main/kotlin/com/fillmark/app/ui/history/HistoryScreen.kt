@@ -1,6 +1,7 @@
 package com.fillmark.app.ui.history
 
-import androidx.compose.foundation.background
+import android.text.format.DateFormat
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,21 +38,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.fillmark.app.R
+import com.fillmark.app.core.DisplayUnit
+import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
-import com.fillmark.app.ui.dashboard.components.getPresetVector
 import com.fillmark.app.ui.history.components.EditLogDialog
-
-import androidx.compose.foundation.BorderStroke
-import com.fillmark.app.ui.theme.FillmarkCardBorder
 import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkCyanDark
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,13 +62,19 @@ fun HistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val undoLabel = stringResource(R.string.action_undo)
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshCurrentDate()
+        onPauseOrDispose {}
+    }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage
         if (msg != null) {
             val result = snackbarHostState.showSnackbar(
                 message = msg,
-                actionLabel = "Undo",
+                actionLabel = undoLabel,
                 duration = SnackbarDuration.Short
             )
             if (result == SnackbarResult.ActionPerformed) {
@@ -98,10 +104,10 @@ fun HistoryScreen(
                         .padding(horizontal = 20.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = "Intake History",
+                        text = stringResource(R.string.history_title),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = FillmarkNavyTitle
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
             }
@@ -115,9 +121,9 @@ fun HistoryScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No drink history recorded yet.",
+                            text = stringResource(R.string.history_empty),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = FillmarkSlateMuted
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -135,6 +141,7 @@ fun HistoryScreen(
                         HistoryRecordItem(
                             record = record,
                             displayUnit = uiState.displayUnit,
+                            hydrationFactorsEnabled = uiState.hydrationFactorsEnabled,
                             onClick = { viewModel.startEditing(record) },
                             onDelete = { viewModel.deleteRecord(record) },
                             modifier = Modifier.padding(horizontal = 16.dp)
@@ -163,7 +170,7 @@ fun HistoryScreen(
 private fun DayHeader(
     friendlyDate: String,
     totalEffectiveVolume: Double,
-    displayUnit: com.fillmark.app.core.DisplayUnit
+    displayUnit: DisplayUnit
 ) {
     Row(
         modifier = Modifier
@@ -179,7 +186,10 @@ private fun DayHeader(
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "Total: ${VolumeConverter.formatVolume(totalEffectiveVolume, displayUnit)}",
+            text = stringResource(
+                R.string.history_day_total,
+                VolumeConverter.formatVolume(totalEffectiveVolume, displayUnit)
+            ),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary
@@ -190,17 +200,21 @@ private fun DayHeader(
 @Composable
 private fun HistoryRecordItem(
     record: HydrationRecordEntity,
-    displayUnit: com.fillmark.app.core.DisplayUnit,
+    displayUnit: DisplayUnit,
+    hydrationFactorsEnabled: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, FillmarkCardBorder),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -208,7 +222,7 @@ private fun HistoryRecordItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
@@ -218,9 +232,9 @@ private fun HistoryRecordItem(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        painter = androidx.compose.ui.res.painterResource(id = com.fillmark.app.core.PresetIcon.getDrawableRes(record.iconKey)),
+                        painter = painterResource(id = PresetIcon.getDrawableRes(record.iconKey)),
                         contentDescription = null,
-                        tint = FillmarkCyanDark,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -231,12 +245,12 @@ private fun HistoryRecordItem(
                     text = record.drinkType.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = FillmarkNavyTitle
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = TimeUtils.formatTime(record.timestamp),
+                    text = TimeUtils.formatTime(record.timestamp, is24Hour = is24Hour),
                     style = MaterialTheme.typography.labelSmall,
-                    color = FillmarkSlateMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -244,14 +258,14 @@ private fun HistoryRecordItem(
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = VolumeConverter.formatVolume(record.effectiveVolumeMl, displayUnit),
+                    text = VolumeConverter.formatVolume(record.countedVolumeMl(hydrationFactorsEnabled), displayUnit),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = FillmarkNavyTitle
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                if (record.hydrationFactor != 1.0) {
+                if (hydrationFactorsEnabled && record.hydrationFactor != 1.0) {
                     Text(
-                        text = "Factor: ${record.hydrationFactor}x",
+                        text = stringResource(R.string.history_factor_label, record.hydrationFactor.toString()),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -260,11 +274,11 @@ private fun HistoryRecordItem(
 
             IconButton(
                 onClick = onDelete,
-                modifier = Modifier.padding(start = 4.dp).size(36.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Delete record",
+                    contentDescription = stringResource(R.string.history_delete_record_cd),
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                     modifier = Modifier.size(20.dp)
                 )
@@ -272,4 +286,3 @@ private fun HistoryRecordItem(
         }
     }
 }
-

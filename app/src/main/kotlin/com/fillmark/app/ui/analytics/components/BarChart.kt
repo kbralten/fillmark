@@ -1,6 +1,7 @@
 package com.fillmark.app.ui.analytics.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -12,10 +13,18 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fillmark.app.R
+import com.fillmark.app.core.DisplayUnit
+import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.ui.analytics.ChartBarData
 import com.fillmark.app.ui.theme.FillmarkCyan
 import com.fillmark.app.ui.theme.FillmarkNavy700
@@ -26,9 +35,23 @@ import kotlin.math.roundToInt
 @Composable
 fun BarChart(
     bars: List<ChartBarData>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
+    selectedIndex: Int? = null,
+    onBarClick: ((Int, ChartBarData) -> Unit)? = null
 ) {
     if (bars.isEmpty()) return
+
+    val selectedBar = selectedIndex?.let { bars.getOrNull(it) }
+    val chartDescription = if (selectedBar != null) {
+        val barLabel = selectedBar.label.ifEmpty {
+            selectedBar.dateIso ?: stringResource(R.string.analytics_period_fallback)
+        }
+        val formattedVolume = VolumeConverter.formatVolume(selectedBar.valueMl, displayUnit)
+        stringResource(R.string.analytics_barchart_selected_a11y, barLabel, formattedVolume)
+    } else {
+        stringResource(R.string.analytics_barchart_a11y, bars.size)
+    }
 
     val trackColor = FillmarkNavy700
     val targetLineColor = Color(0x66A5B9CC)
@@ -45,13 +68,33 @@ fun BarChart(
             .fillMaxWidth()
             .height(205.dp)
             .padding(top = 10.dp, bottom = 4.dp, start = 4.dp, end = 4.dp)
+            .semantics { contentDescription = chartDescription }
+            .then(
+                if (onBarClick != null) {
+                    Modifier.pointerInput(bars) {
+                        detectTapGestures { offset ->
+                            val chartWidth = size.width.toFloat()
+                            if (chartWidth > 0f && bars.isNotEmpty()) {
+                                val slotWidth = chartWidth / bars.size
+                                val idx = (offset.x / slotWidth).toInt().coerceIn(0, bars.lastIndex)
+                                onBarClick(idx, bars[idx])
+                            }
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
     ) {
         val chartHeight = size.height - 28.dp.toPx()
         val chartWidth = size.width
         val barCount = bars.size
         val barSpacing = (chartWidth / barCount) * 0.22f
         val barWidth = (chartWidth / barCount) - barSpacing
-        val cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+        val cornerPx = minOf(10.dp.toPx(), barWidth / 2f)
+        val cornerRadius = CornerRadius(cornerPx, cornerPx)
+        val badgeWidth = 28.dp.toPx()
+        val showBadges = barWidth >= badgeWidth
 
         // 1. Subtle horizontal dashed target line
         val avgTarget = bars.map { it.targetMl }.average()
@@ -98,44 +141,57 @@ fun BarChart(
                     size = Size(barWidth, barHeight),
                     cornerRadius = cornerRadius
                 )
+            }
 
-                // Accent percentage badge for days featuring historical data
-                val pct = if (bar.targetMl > 0) {
-                    ((bar.valueMl / bar.targetMl) * 100).roundToInt()
-                } else 100
-
-                val isHighOrCurrent = pct >= 50 || bar.isCurrent
-                val badgeBgColor = if (isHighOrCurrent) FillmarkCyan else Color(0xFFF5A67B)
-                val badgeWidth = 28.dp.toPx()
-                val badgeHeight = 15.dp.toPx()
-                val badgeCorner = CornerRadius(7.5.dp.toPx(), 7.5.dp.toPx())
-                val badgeCenterX = left + barWidth / 2f
-                val badgeLeft = badgeCenterX - badgeWidth / 2f
-
-                // Position badge right at the fill boundary or slightly offset
-                val badgeTop = (top - badgeHeight / 2f).coerceIn(2.dp.toPx(), chartHeight - badgeHeight - 2.dp.toPx())
-
+            if (selectedIndex == index) {
                 drawRoundRect(
-                    color = badgeBgColor,
-                    topLeft = Offset(badgeLeft, badgeTop),
-                    size = Size(badgeWidth, badgeHeight),
-                    cornerRadius = badgeCorner
+                    color = Color.White,
+                    topLeft = Offset(left, 0f),
+                    size = Size(barWidth, chartHeight),
+                    cornerRadius = cornerRadius,
+                    style = Stroke(width = 1.5.dp.toPx())
                 )
+            }
 
-                // Draw percentage text inside badge
-                val badgeTextPaint = android.graphics.Paint().apply {
-                    color = badgeNavyColorInt
-                    textSize = 8.5.sp.toPx()
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isAntiAlias = true
+            if (hasData) {
+                // Accent percentage badge when bars are wide enough to render cleanly
+                if (showBadges) {
+                    val pct = if (bar.targetMl > 0) {
+                        ((bar.valueMl / bar.targetMl) * 100).roundToInt()
+                    } else 100
+
+                    val isHighOrCurrent = pct >= 50 || bar.isCurrent
+                    val badgeBgColor = if (isHighOrCurrent) FillmarkCyan else Color(0xFFF5A67B)
+                    val badgeHeight = 15.dp.toPx()
+                    val badgeCorner = CornerRadius(7.5.dp.toPx(), 7.5.dp.toPx())
+                    val badgeCenterX = left + barWidth / 2f
+                    val badgeLeft = badgeCenterX - badgeWidth / 2f
+
+                    // Position badge right at the fill boundary or slightly offset
+                    val badgeTop = (top - badgeHeight / 2f).coerceIn(2.dp.toPx(), chartHeight - badgeHeight - 2.dp.toPx())
+
+                    drawRoundRect(
+                        color = badgeBgColor,
+                        topLeft = Offset(badgeLeft, badgeTop),
+                        size = Size(badgeWidth, badgeHeight),
+                        cornerRadius = badgeCorner
+                    )
+
+                    // Draw percentage text inside badge
+                    val badgeTextPaint = android.graphics.Paint().apply {
+                        color = badgeNavyColorInt
+                        textSize = 8.5.sp.toPx()
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        "$pct%",
+                        badgeCenterX,
+                        badgeTop + badgeHeight * 0.74f,
+                        badgeTextPaint
+                    )
                 }
-                drawContext.canvas.nativeCanvas.drawText(
-                    "$pct%",
-                    badgeCenterX,
-                    badgeTop + badgeHeight * 0.74f,
-                    badgeTextPaint
-                )
             }
 
             // Bottom Day Label (e.g., Thu, Fri, Sat...)

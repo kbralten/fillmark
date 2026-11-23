@@ -18,13 +18,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 data class DayHydrationSummary(
     val dateIso: String,
     val effectiveVolumeMl: Double,
     val targetMl: Double,
-    val records: List<HydrationRecordEntity>
+    val records: List<HydrationRecordEntity>,
+    val isTargetOverridden: Boolean = false,
+    val defaultTargetMl: Double = 2500.0,
+    val hydrationFactorsEnabled: Boolean = true
 )
 
 class HydrationRepository(
@@ -59,23 +63,36 @@ class HydrationRepository(
      * Observes today's hydration records and total effective volume.
      */
     fun observeTodaySummary(zoneId: ZoneId = ZoneId.systemDefault()): Flow<DayHydrationSummary> {
-        val today = LocalDate.now(zoneId)
-        val startMillis = TimeUtils.startOfDayMillis(today, zoneId)
-        val endMillis = TimeUtils.endOfDayMillis(today, zoneId)
-        val dateIso = TimeUtils.currentDateIso(zoneId)
+        return observeSummaryForDate(LocalDate.now(zoneId), zoneId)
+    }
+
+    /**
+     * Observes a specific date's hydration records, target, and total effective volume.
+     */
+    fun observeSummaryForDate(
+        date: LocalDate,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): Flow<DayHydrationSummary> {
+        val startMillis = TimeUtils.startOfDayMillis(date, zoneId)
+        val endMillis = TimeUtils.endOfDayMillis(date, zoneId)
+        val dateIso = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
 
         val recordsFlow = hydrationDao.observeRecordsBetween(startMillis, endMillis)
         val targetFlow = targetDao.observeTargetForDate(dateIso)
         val prefsFlow = preferencesRepository.preferencesFlow
 
         return combine(recordsFlow, targetFlow, prefsFlow) { records, targetEntity, prefs ->
-            val effectiveTotal = records.sumOf { it.effectiveVolumeMl }
+            val effectiveTotal = records.sumOf { it.countedVolumeMl(prefs.hydrationFactorsEnabled) }
             val activeTarget = targetEntity?.targetMl ?: prefs.defaultDailyTargetMl
+            val isOverridden = targetEntity != null && targetEntity.targetMl != prefs.defaultDailyTargetMl
             DayHydrationSummary(
                 dateIso = dateIso,
                 effectiveVolumeMl = effectiveTotal,
                 targetMl = activeTarget,
-                records = records
+                records = records,
+                isTargetOverridden = isOverridden,
+                defaultTargetMl = prefs.defaultDailyTargetMl,
+                hydrationFactorsEnabled = prefs.hydrationFactorsEnabled
             )
         }
     }
@@ -150,6 +167,65 @@ class HydrationRepository(
 
     suspend fun setTargetForDate(dateIso: String, targetMl: Double) {
         targetDao.upsertTarget(DailyTargetEntity(dateString = dateIso, targetMl = targetMl))
+    }
+
+    suspend fun clearTargetOverrideForDate(dateIso: String) {
+        targetDao.deleteTargetForDate(dateIso)
+    }
+
+    suspend fun hasAnyRecords(): Boolean = hydrationDao.getEarliestRecordTimestamp() != null
+
+    suspend fun clearAllData() {
+        hydrationDao.deleteAllRecords()
+        targetDao.deleteAllTargets()
+        presetDao.deleteAllPresets()
+        presetDao.insertPresets(FillmarkDatabase.DEFAULT_PRESETS)
+        preferencesRepository.resetPreferencesKeepOnboarding()
+    }
+
+    /**
+     * Updates the daily target for today and future days while freezing unrecorded
+     * historical days at the previous target so past compliance is preserved.
+     */
+    suspend fun updateDailyTargetPreservingHistory(
+        newTargetMl: Double,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ) {
+        val oldTargetMl = preferencesRepository.preferencesFlow.first().defaultDailyTargetMl
+        val today = LocalDate.now(zoneId)
+        val todayIso = today.format(DateTimeFormatter.ISO_LOCAL_DATE)
+
+        if (oldTargetMl != newTargetMl) {
+            val earliestTs = hydrationDao.getEarliestRecordTimestamp()
+            val earliestDate = earliestTs?.let { TimeUtils.toLocalDate(it, zoneId) }
+            val pastDates = computeHistoricalTargetFreezeDates(earliestDate, today)
+            if (pastDates.isNotEmpty()) {
+                val pastTargets = pastDates.map { dateIso ->
+                    DailyTargetEntity(dateString = dateIso, targetMl = oldTargetMl)
+                }
+                targetDao.insertTargetsIgnore(pastTargets)
+            }
+        }
+
+        targetDao.upsertTarget(DailyTargetEntity(dateString = todayIso, targetMl = newTargetMl))
+        preferencesRepository.updateDefaultDailyTargetMl(newTargetMl)
+    }
+
+    companion object {
+        fun computeHistoricalTargetFreezeDates(
+            earliestDate: LocalDate?,
+            today: LocalDate
+        ): List<String> {
+            val start = earliestDate ?: return emptyList()
+            if (!start.isBefore(today)) return emptyList()
+            val dates = mutableListOf<String>()
+            var cursor = start
+            while (cursor.isBefore(today)) {
+                dates.add(cursor.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                cursor = cursor.plusDays(1)
+            }
+            return dates
+        }
     }
 
     suspend fun getRecordsBetween(startMillis: Long, endMillis: Long): List<HydrationRecordEntity> {

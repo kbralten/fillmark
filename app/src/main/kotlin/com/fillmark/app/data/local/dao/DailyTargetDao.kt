@@ -18,7 +18,22 @@ interface DailyTargetDao {
     @Query("SELECT * FROM daily_targets ORDER BY date_string DESC")
     fun observeAllTargets(): Flow<List<DailyTargetEntity>>
 
+    @Query("SELECT * FROM daily_targets ORDER BY date_string DESC")
+    suspend fun getAllTargets(): List<DailyTargetEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertTarget(target: DailyTargetEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTargets(targets: List<DailyTargetEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertTargetsIgnore(targets: List<DailyTargetEntity>)
+
+    @Query("DELETE FROM daily_targets WHERE date_string = :dateString")
+    suspend fun deleteTargetForDate(dateString: String)
+
+    @Query("DELETE FROM daily_targets")
+    suspend fun deleteAllTargets()
 }
 

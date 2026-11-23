@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Fillmark" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#091420</item>
+    </style>
+
+    <style name="Theme.Fillmark.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#091420</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Fillmark</item>
+    </style>
+</resources>

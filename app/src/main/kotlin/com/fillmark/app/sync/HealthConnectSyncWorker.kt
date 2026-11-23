@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.fillmark.app.data.local.FillmarkDatabase
 import com.fillmark.app.data.local.UserPreferencesRepository
+import com.fillmark.app.widget.WidgetUpdateHelper
 import kotlinx.coroutines.flow.first
 
 class HealthConnectSyncWorker(
@@ -31,11 +32,17 @@ class HealthConnectSyncWorker(
         hcManager.syncOutbound(database)
 
         // Step 2: Inbound sync (if bidirectional sync is enabled)
+        var inboundChanged = 0
         if (prefs.healthConnectBidirectional) {
-            hcManager.syncInbound(database)
+            inboundChanged = hcManager.syncInbound(database)
+        }
+
+        prefsRepository.setLastHealthConnectSyncMillis(System.currentTimeMillis())
+
+        if (inboundChanged > 0) {
+            WidgetUpdateHelper.updateAllWidgets(applicationContext)
         }
 
         return Result.success()
     }
 }
-

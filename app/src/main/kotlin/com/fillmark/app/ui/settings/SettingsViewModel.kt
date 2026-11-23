@@ -1,19 +1,23 @@
 package com.fillmark.app.ui.settings
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
+import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
+import com.fillmark.app.core.ShortcutHelper
 import com.fillmark.app.core.VolumeConverter
-import com.fillmark.app.data.local.UserPreferences
+import com.fillmark.app.data.backup.BackupManager
+import com.fillmark.app.data.local.FillmarkDatabase
+import com.fillmark.app.data.local.ThemeMode
 import com.fillmark.app.data.local.UserPreferencesRepository
+import com.fillmark.app.data.repository.HydrationRepository
 import com.fillmark.app.sync.HealthConnectManager
-import com.fillmark.app.sync.HealthConnectSyncWorker
 import com.fillmark.app.widget.WidgetUpdateHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,15 +30,24 @@ data class SettingsUiState(
     val wakingHoursStart: String = "07:00",
     val wakingHoursEnd: String = "23:00",
     val wakingPacingEnabled: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val dynamicColorEnabled: Boolean = false,
+    val hydrationFactorsEnabled: Boolean = true,
     val healthConnectSyncEnabled: Boolean = false,
     val healthConnectBidirectional: Boolean = false,
+    val healthConnectSdkStatus: Int = HealthConnectClient.SDK_UNAVAILABLE,
     val isHealthConnectAvailable: Boolean = false,
-    val hasHealthConnectPermissions: Boolean = false
+    val hasHealthConnectPermissions: Boolean = false,
+    val lastHealthConnectSyncMillis: Long = 0L,
+    val isSyncingHealthConnect: Boolean = false,
+    val isBackupBusy: Boolean = false,
+    val statusMessage: String? = null
 )
 
 class SettingsViewModel @JvmOverloads constructor(
     application: Application,
-    private val preferencesRepository: UserPreferencesRepository = UserPreferencesRepository(application)
+    private val preferencesRepository: UserPreferencesRepository = UserPreferencesRepository(application),
+    private val hydrationRepository: HydrationRepository = HydrationRepository(application)
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -45,7 +58,9 @@ class SettingsViewModel @JvmOverloads constructor(
     init {
         viewModelScope.launch {
             preferencesRepository.preferencesFlow.collect { prefs ->
-                val hasPerms = hcManager.hasAllPermissions()
+                val sdkStatus = hcManager.getSdkStatus()
+                val isAvailable = sdkStatus == HealthConnectClient.SDK_AVAILABLE
+                val hasPerms = if (isAvailable) hcManager.hasAllPermissions() else false
                 _uiState.update {
                     it.copy(
                         displayUnit = prefs.displayUnit,
@@ -53,10 +68,15 @@ class SettingsViewModel @JvmOverloads constructor(
                         wakingHoursStart = prefs.wakingHoursStart,
                         wakingHoursEnd = prefs.wakingHoursEnd,
                         wakingPacingEnabled = prefs.wakingPacingEnabled,
+                        themeMode = prefs.themeMode,
+                        dynamicColorEnabled = prefs.dynamicColorEnabled,
+                        hydrationFactorsEnabled = prefs.hydrationFactorsEnabled,
                         healthConnectSyncEnabled = prefs.healthConnectSyncEnabled,
                         healthConnectBidirectional = prefs.healthConnectBidirectional,
-                        isHealthConnectAvailable = hcManager.isAvailable(),
-                        hasHealthConnectPermissions = hasPerms
+                        healthConnectSdkStatus = sdkStatus,
+                        isHealthConnectAvailable = isAvailable,
+                        hasHealthConnectPermissions = hasPerms,
+                        lastHealthConnectSyncMillis = prefs.lastHealthConnectSyncMillis
                     )
                 }
             }
@@ -67,17 +87,41 @@ class SettingsViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             preferencesRepository.updateDisplayUnit(unit)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
+            ShortcutHelper.updateShortcuts(getApplication())
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            preferencesRepository.updateThemeMode(mode)
+        }
+    }
+
+    fun setDynamicColorEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateDynamicColorEnabled(enabled)
+        }
+    }
+
+    fun setHydrationFactorsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateHydrationFactorsEnabled(enabled)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
         }
     }
 
     fun setDefaultTarget(targetInCurrentUnit: Double) {
+        val internalMl = if (targetInCurrentUnit > 0) {
+            VolumeConverter.toInternalMl(targetInCurrentUnit, _uiState.value.displayUnit)
+        } else {
+            0.0
+        }
+        setDefaultTargetMl(internalMl)
+    }
+
+    fun setDefaultTargetMl(targetMl: Double) {
         viewModelScope.launch {
-            val internalMl = if (targetInCurrentUnit > 0) {
-                VolumeConverter.toInternalMl(targetInCurrentUnit, _uiState.value.displayUnit)
-            } else {
-                0.0
-            }
-            preferencesRepository.updateDefaultDailyTargetMl(internalMl)
+            hydrationRepository.updateDailyTargetPreservingHistory(targetMl)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
         }
     }
@@ -93,30 +137,112 @@ class SettingsViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             preferencesRepository.updateHealthConnectSettings(enabled, bidirectional)
             if (enabled) {
-                try {
-                    val syncRequest = OneTimeWorkRequestBuilder<HealthConnectSyncWorker>().build()
-                    WorkManager.getInstance(getApplication()).enqueueUniqueWork(
-                        "HealthConnectOutboundSync",
-                        ExistingWorkPolicy.REPLACE,
-                        syncRequest
-                    )
-                } catch (e: Exception) {
-                    Log.e("SettingsViewModel", "Failed to enqueue initial Health Connect sync", e)
+                HealthConnectManager.schedulePeriodicSync(getApplication())
+                HealthConnectManager.enqueueImmediateSync(getApplication(), replace = true)
+            } else {
+                HealthConnectManager.cancelPeriodicSync(getApplication())
+            }
+        }
+    }
+
+    fun syncHealthConnectNow() {
+        if (_uiState.value.isSyncingHealthConnect) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isSyncingHealthConnect = true) }
+            try {
+                if (hcManager.isAvailable() && hcManager.hasAllPermissions()) {
+                    val database = FillmarkDatabase.getInstance(getApplication())
+                    hcManager.syncOutbound(database)
+                    if (_uiState.value.healthConnectBidirectional) {
+                        val imported = hcManager.syncInbound(database)
+                        if (imported > 0) {
+                            WidgetUpdateHelper.updateAllWidgets(getApplication())
+                        }
+                    }
+                    preferencesRepository.setLastHealthConnectSyncMillis(System.currentTimeMillis())
                 }
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Manual Health Connect sync failed", e)
+            } finally {
+                _uiState.update { it.copy(isSyncingHealthConnect = false) }
             }
         }
     }
 
     fun refreshHealthConnectStatus() {
         viewModelScope.launch {
-            val hasPerms = hcManager.hasAllPermissions()
+            val sdkStatus = hcManager.getSdkStatus()
+            val isAvailable = sdkStatus == HealthConnectClient.SDK_AVAILABLE
+            val hasPerms = if (isAvailable) hcManager.hasAllPermissions() else false
             _uiState.update {
                 it.copy(
-                    isHealthConnectAvailable = hcManager.isAvailable(),
+                    healthConnectSdkStatus = sdkStatus,
+                    isHealthConnectAvailable = isAvailable,
                     hasHealthConnectPermissions = hasPerms
                 )
             }
         }
     }
-}
 
+    fun exportBackupJson(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true) }
+            val app = getApplication<Application>()
+            val message = runCatching {
+                val res = BackupManager.exportBackupToUri(app, uri)
+                app.getString(R.string.settings_exported_backup, res.recordsCount, res.presetsCount)
+            }.getOrElse {
+                app.getString(R.string.settings_export_failed, it.localizedMessage ?: app.getString(R.string.error_unknown))
+            }
+            _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
+        }
+    }
+
+    fun restoreBackupJson(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true) }
+            val app = getApplication<Application>()
+            val message = runCatching {
+                val res = BackupManager.restoreBackupFromUri(app, uri)
+                app.getString(R.string.settings_restored_backup, res.recordsCount, res.presetsCount)
+            }.getOrElse {
+                app.getString(R.string.settings_restore_failed, it.localizedMessage ?: app.getString(R.string.error_invalid_backup))
+            }
+            _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
+        }
+    }
+
+    fun exportLogsCsv(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true) }
+            val app = getApplication<Application>()
+            val message = runCatching {
+                val count = BackupManager.exportCsvToUri(app, uri)
+                app.getString(R.string.settings_exported_csv, count)
+            }.getOrElse {
+                app.getString(R.string.settings_csv_failed, it.localizedMessage ?: app.getString(R.string.error_unknown))
+            }
+            _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
+        }
+    }
+
+    fun clearAllData() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true) }
+            val app = getApplication<Application>()
+            val message = runCatching {
+                hydrationRepository.clearAllData()
+                WidgetUpdateHelper.updateAllWidgets(app)
+                ShortcutHelper.updateShortcuts(app)
+                app.getString(R.string.settings_cleared_data)
+            }.getOrElse {
+                app.getString(R.string.settings_clear_failed, it.localizedMessage ?: app.getString(R.string.error_unknown))
+            }
+            _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
+        }
+    }
+
+    fun clearStatusMessage() {
+        _uiState.update { it.copy(statusMessage = null) }
+    }
+}

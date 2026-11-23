@@ -61,5 +61,11 @@ interface HydrationDao {
 
     @Query("SELECT SUM(volume_ml * hydration_factor) FROM hydration_records WHERE timestamp >= :startTime AND timestamp <= :endTime")
     fun observeTotalEffectiveMlBetween(startTime: Long, endTime: Long): Flow<Double?>
+
+    @Query("SELECT MIN(timestamp) FROM hydration_records")
+    suspend fun getEarliestRecordTimestamp(): Long?
+
+    @Query("DELETE FROM hydration_records")
+    suspend fun deleteAllRecords()
 }
 

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -35,30 +38,45 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.domain.PacingResult
 import com.fillmark.app.domain.PacingStatus
 import com.fillmark.app.ui.theme.FillmarkCyan
 import com.fillmark.app.ui.theme.FillmarkIndigo
-import com.fillmark.app.ui.theme.FillmarkNavy900
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 import com.fillmark.app.ui.theme.PaceAheadBg
+import com.fillmark.app.ui.theme.PaceAheadBgDark
 import com.fillmark.app.ui.theme.PaceAheadBorder
+import com.fillmark.app.ui.theme.PaceAheadBorderDark
 import com.fillmark.app.ui.theme.PaceAheadIcon
+import com.fillmark.app.ui.theme.PaceAheadIconDark
 import com.fillmark.app.ui.theme.PaceAheadText
+import com.fillmark.app.ui.theme.PaceAheadTextDark
 import com.fillmark.app.ui.theme.PaceBehindBg
+import com.fillmark.app.ui.theme.PaceBehindBgDark
 import com.fillmark.app.ui.theme.PaceBehindBorder
+import com.fillmark.app.ui.theme.PaceBehindBorderDark
 import com.fillmark.app.ui.theme.PaceBehindIcon
+import com.fillmark.app.ui.theme.PaceBehindIconDark
 import com.fillmark.app.ui.theme.PaceBehindText
+import com.fillmark.app.ui.theme.PaceBehindTextDark
 import com.fillmark.app.ui.theme.PaceOnTrackBg
+import com.fillmark.app.ui.theme.PaceOnTrackBgDark
 import com.fillmark.app.ui.theme.PaceOnTrackBorder
+import com.fillmark.app.ui.theme.PaceOnTrackBorderDark
 import com.fillmark.app.ui.theme.PaceOnTrackIcon
+import com.fillmark.app.ui.theme.PaceOnTrackIconDark
 import com.fillmark.app.ui.theme.PaceOnTrackText
+import com.fillmark.app.ui.theme.PaceOnTrackTextDark
 import kotlin.math.roundToInt
 
 @Composable
@@ -67,7 +85,9 @@ fun FluidProgressMeter(
     targetMl: Double,
     displayUnit: DisplayUnit,
     pacingResult: PacingResult?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isTargetOverridden: Boolean = false,
+    onTargetClick: (() -> Unit)? = null
 ) {
     val hasTarget = targetMl > 0
     val progressRatio = if (hasTarget) (effectiveVolumeMl / targetMl).toFloat() else 0f
@@ -84,15 +104,53 @@ fun FluidProgressMeter(
         label = "PacingAnimation"
     )
 
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val trackColor = if (isDark) Color(0xFF1A2F44) else Color(0xFFE2EAF1)
+    val pacingTrackColor = if (isDark) Color(0xFF2B587E) else FillmarkIndigo
+    val primaryTextColor = MaterialTheme.colorScheme.onBackground
+    val mutedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val consumedFormatted = VolumeConverter.formatVolume(effectiveVolumeMl, displayUnit)
+    val percent = if (hasTarget) (progressRatio * 100).roundToInt() else 0
+    val gaugeContentDescription = if (hasTarget) {
+        val targetFormatted = VolumeConverter.formatVolume(targetMl, displayUnit)
+        if (pacingResult != null) {
+            stringResource(
+                R.string.meter_a11y_with_target_and_pace,
+                consumedFormatted,
+                targetFormatted,
+                percent,
+                pacingResult.statusText
+            )
+        } else {
+            stringResource(R.string.meter_a11y_with_target, consumedFormatted, targetFormatted, percent)
+        }
+    } else {
+        stringResource(R.string.meter_a11y_no_target, consumedFormatted)
+    }
+
+    val density = LocalDensity.current
+    val gaugeScale = density.fontScale.coerceIn(1f, 1.18f)
+    val ringSize = 246.dp * gaugeScale
+    val displayStyle = MaterialTheme.typography.displayMedium
+    val numberFontSize = displayStyle.fontSize * (density.fontScale.coerceAtMost(1.3f) / density.fontScale)
+    val subtitleStyle = MaterialTheme.typography.bodyMedium
+    val subtitleFontSize = subtitleStyle.fontSize * (density.fontScale.coerceAtMost(1.35f) / density.fontScale)
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(246.dp),
+            modifier = Modifier.size(ringSize),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp)
+                    .semantics { contentDescription = gaugeContentDescription }
+            ) {
                 val strokeWidth = 14.dp.toPx()
                 val radius = (size.minDimension - strokeWidth) / 2
                 val centerOffset = Offset(size.width / 2, size.height / 2)
@@ -101,7 +159,7 @@ fun FluidProgressMeter(
                 // Subtle water wave / gradient graphic behind the metric texts
                 val clipCircle = Path().apply {
                     addOval(
-                        androidx.compose.ui.geometry.Rect(
+                        Rect(
                             centerOffset.x - innerRadius,
                             centerOffset.y - innerRadius,
                             centerOffset.x + innerRadius,
@@ -111,8 +169,6 @@ fun FluidProgressMeter(
                 }
 
                 clipPath(clipCircle) {
-                    val waveWidth = innerRadius * 2
-                    val waveHeight = innerRadius * 2
                     val waveBaseY = centerOffset.y + innerRadius * 0.15f
 
                     // Secondary subtle wave (background)
@@ -166,7 +222,7 @@ fun FluidProgressMeter(
 
                 // Outer circular track (subtle background ring)
                 drawArc(
-                    color = Color(0xFFE2EAF1),
+                    color = trackColor,
                     startAngle = 0f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -180,7 +236,7 @@ fun FluidProgressMeter(
                     if (animatedPacing > 0.01f) {
                         val pacingSweep = (animatedPacing * 360f).coerceIn(4f, 360f)
                         drawArc(
-                            color = FillmarkIndigo,
+                            color = pacingTrackColor,
                             startAngle = -90f,
                             sweepAngle = pacingSweep,
                             useCenter = false,
@@ -222,43 +278,108 @@ fun FluidProgressMeter(
 
             // Central Metric Texts
             Column(
+                modifier = Modifier.padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 if (hasTarget) {
-                    val percent = (progressRatio * 100).roundToInt()
                     Text(
                         text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
-                        style = MaterialTheme.typography.displayMedium,
+                        style = displayStyle,
+                        fontSize = numberFontSize,
                         fontWeight = FontWeight.ExtraBold,
-                        color = FillmarkNavyTitle
+                        maxLines = 1,
+                        softWrap = false,
+                        color = primaryTextColor
                     )
                     Text(
                         text = displayUnit.symbol,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = FillmarkNavyTitle.copy(alpha = 0.85f)
+                        maxLines = 1,
+                        color = primaryTextColor.copy(alpha = 0.85f)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "$percent% of ${VolumeConverter.formatVolume(targetMl, displayUnit)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Normal,
-                        color = FillmarkSlateMuted
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = if (onTargetClick != null) {
+                            Modifier
+                                .clickable(onClick = onTargetClick)
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        } else {
+                            Modifier
+                        }
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.meter_percent_of_target,
+                                percent,
+                                VolumeConverter.formatVolume(targetMl, displayUnit)
+                            ),
+                            style = subtitleStyle,
+                            fontSize = subtitleFontSize,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = mutedTextColor
+                        )
+                        if (onTargetClick != null) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = stringResource(R.string.meter_adjust_target_cd),
+                                tint = mutedTextColor,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                    }
+                    if (isTargetOverridden) {
+                        Text(
+                            text = stringResource(R.string.meter_today_only),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 } else {
                     Text(
                         text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
-                        style = MaterialTheme.typography.displayMedium,
+                        style = displayStyle,
+                        fontSize = numberFontSize,
                         fontWeight = FontWeight.ExtraBold,
-                        color = FillmarkNavyTitle
+                        maxLines = 1,
+                        softWrap = false,
+                        color = primaryTextColor
                     )
                     Text(
                         text = displayUnit.symbol,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = FillmarkNavyTitle
+                        maxLines = 1,
+                        color = primaryTextColor
                     )
+                    if (onTargetClick != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .clickable(onClick = onTargetClick)
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.meter_set_today_goal),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = stringResource(R.string.meter_set_today_goal),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -268,24 +389,24 @@ fun FluidProgressMeter(
             Spacer(modifier = Modifier.height(14.dp))
             val (bgColor, borderColor, textColor, iconColor, iconVector) = when (pacingResult.status) {
                 PacingStatus.BEHIND -> PaceStatusStyle(
-                    bg = PaceBehindBg,
-                    border = PaceBehindBorder,
-                    text = PaceBehindText,
-                    iconTint = PaceBehindIcon,
+                    bg = if (isDark) PaceBehindBgDark else PaceBehindBg,
+                    border = if (isDark) PaceBehindBorderDark else PaceBehindBorder,
+                    text = if (isDark) PaceBehindTextDark else PaceBehindText,
+                    iconTint = if (isDark) PaceBehindIconDark else PaceBehindIcon,
                     icon = Icons.Filled.Error
                 )
                 PacingStatus.ON_TRACK -> PaceStatusStyle(
-                    bg = PaceOnTrackBg,
-                    border = PaceOnTrackBorder,
-                    text = PaceOnTrackText,
-                    iconTint = PaceOnTrackIcon,
+                    bg = if (isDark) PaceOnTrackBgDark else PaceOnTrackBg,
+                    border = if (isDark) PaceOnTrackBorderDark else PaceOnTrackBorder,
+                    text = if (isDark) PaceOnTrackTextDark else PaceOnTrackText,
+                    iconTint = if (isDark) PaceOnTrackIconDark else PaceOnTrackIcon,
                     icon = Icons.Filled.CheckCircle
                 )
                 PacingStatus.AHEAD -> PaceStatusStyle(
-                    bg = PaceAheadBg,
-                    border = PaceAheadBorder,
-                    text = PaceAheadText,
-                    iconTint = PaceAheadIcon,
+                    bg = if (isDark) PaceAheadBgDark else PaceAheadBg,
+                    border = if (isDark) PaceAheadBorderDark else PaceAheadBorder,
+                    text = if (isDark) PaceAheadTextDark else PaceAheadText,
+                    iconTint = if (isDark) PaceAheadIconDark else PaceAheadIcon,
                     icon = Icons.Filled.CheckCircle
                 )
             }
@@ -302,13 +423,13 @@ fun FluidProgressMeter(
                 ) {
                     Icon(
                         imageVector = iconVector,
-                        contentDescription = "Pace Status",
+                        contentDescription = stringResource(R.string.meter_pace_status_cd),
                         tint = iconColor,
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Pace: ${pacingResult.statusText}",
+                        text = stringResource(R.string.meter_pace_label, pacingResult.statusText),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = textColor

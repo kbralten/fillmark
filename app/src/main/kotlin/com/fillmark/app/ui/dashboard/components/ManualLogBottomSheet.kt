@@ -1,7 +1,7 @@
 package com.fillmark.app.ui.dashboard.components
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -35,32 +35,39 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.DrinkType
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.ui.common.DateTimePickerDialog
 import com.fillmark.app.ui.common.UnitToggle
-import java.time.LocalTime
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualLogBottomSheet(
     displayUnit: DisplayUnit,
+    hydrationFactorsEnabled: Boolean = true,
     onDismiss: () -> Unit,
     onLogRecord: (volumeMl: Double, factor: Double, drinkType: String, timestamp: Long) -> Unit,
     sheetState: SheetState
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
+    val todayLabel = stringResource(R.string.today)
+    val yesterdayLabel = stringResource(R.string.yesterday)
+    val atFormat = stringResource(R.string.date_at_time)
+
     var selectedUnit by remember { mutableStateOf(displayUnit) }
     var volumeInput by remember {
         mutableStateOf(if (displayUnit == DisplayUnit.METRIC_ML) "250" else "8.5")
@@ -73,6 +80,15 @@ fun ManualLogBottomSheet(
     val volumeVal = volumeInput.toDoubleOrNull() ?: 0.0
     val internalMl = VolumeConverter.toInternalMl(volumeVal, selectedUnit)
     val effectiveMl = internalMl * selectedDrinkType.defaultHydrationFactor
+    val isVolumeValid = internalMl > 0 && internalMl <= VolumeConverter.MAX_SINGLE_DRINK_ML
+    val volumeErrorText = when {
+        volumeInput.isBlank() || internalMl <= 0 -> stringResource(R.string.error_volume_gt_zero)
+        internalMl > VolumeConverter.MAX_SINGLE_DRINK_ML -> stringResource(
+            R.string.error_max_single_drink,
+            VolumeConverter.formatVolume(VolumeConverter.MAX_SINGLE_DRINK_ML, selectedUnit)
+        )
+        else -> null
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -86,7 +102,7 @@ fun ManualLogBottomSheet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Log Drink",
+                text = stringResource(R.string.manual_log_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -101,7 +117,7 @@ fun ManualLogBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Volume",
+                    text = stringResource(R.string.volume_label),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -122,10 +138,12 @@ fun ManualLogBottomSheet(
             // Volume Input
             OutlinedTextField(
                 value = volumeInput,
-                onValueChange = { volumeInput = it.filter { char -> char.isDigit() || char == '.' } },
-                label = { Text("Volume (${selectedUnit.symbol})") },
+                onValueChange = { volumeInput = VolumeConverter.sanitizeDecimalInput(it) },
+                label = { Text(stringResource(R.string.volume_with_unit, selectedUnit.symbol)) },
                 suffix = { Text(selectedUnit.symbol) },
                 singleLine = true,
+                isError = volumeErrorText != null,
+                supportingText = volumeErrorText?.let { msg -> { Text(msg) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier.fillMaxWidth()
@@ -135,7 +153,7 @@ fun ManualLogBottomSheet(
 
             // Drink Type Selector Chips
             Text(
-                text = "Drink Category",
+                text = stringResource(R.string.drink_category_label),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.Start)
@@ -163,35 +181,40 @@ fun ManualLogBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (hydrationFactorsEnabled) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Hydration Factor Preview
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Hydration Factor Preview
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "Water Factor: ${selectedDrinkType.defaultHydrationFactor}x",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val effectiveText = if (selectedUnit != displayUnit) {
-                        "${VolumeConverter.formatVolume(effectiveMl, selectedUnit)} (${VolumeConverter.formatVolume(effectiveMl, displayUnit)})"
-                    } else {
-                        VolumeConverter.formatVolume(effectiveMl, selectedUnit)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.manual_log_water_factor,
+                                selectedDrinkType.defaultHydrationFactor.toString()
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        val effectiveText = if (selectedUnit != displayUnit) {
+                            "${VolumeConverter.formatVolume(effectiveMl, selectedUnit)} (${VolumeConverter.formatVolume(effectiveMl, displayUnit)})"
+                        } else {
+                            VolumeConverter.formatVolume(effectiveMl, selectedUnit)
+                        }
+                        Text(
+                            text = stringResource(R.string.manual_log_effective, effectiveText),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                    Text(
-                        text = "Effective: $effectiveText",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 }
             }
 
@@ -225,7 +248,11 @@ fun ManualLogBottomSheet(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isOverridden) "Overridden Time" else "Time of Consumption",
+                                text = if (isOverridden) {
+                                    stringResource(R.string.manual_log_overridden_time)
+                                } else {
+                                    stringResource(R.string.manual_log_time_of_consumption)
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = if (isOverridden) FontWeight.SemiBold else FontWeight.Normal,
                                 color = if (isOverridden) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -233,9 +260,18 @@ fun ManualLogBottomSheet(
                         }
                         Text(
                             text = if (isOverridden) {
-                                TimeUtils.formatDateTime(timestampMillis)
+                                TimeUtils.formatDateTime(
+                                    epochMillis = timestampMillis,
+                                    is24Hour = is24Hour,
+                                    todayLabel = todayLabel,
+                                    yesterdayLabel = yesterdayLabel,
+                                    atFormat = atFormat
+                                )
                             } else {
-                                "Now (${TimeUtils.formatTime(timestampMillis)})"
+                                stringResource(
+                                    R.string.manual_log_now,
+                                    TimeUtils.formatTime(timestampMillis, is24Hour = is24Hour)
+                                )
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
@@ -259,7 +295,7 @@ fun ManualLogBottomSheet(
                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "Reset to Now",
+                                    text = stringResource(R.string.manual_log_reset_now),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -278,7 +314,11 @@ fun ManualLogBottomSheet(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isOverridden) "Change" else "Override time/date...",
+                                text = if (isOverridden) {
+                                    stringResource(R.string.action_change)
+                                } else {
+                                    stringResource(R.string.manual_log_override_time)
+                                },
                                 style = MaterialTheme.typography.labelMedium
                             )
                         }
@@ -289,9 +329,9 @@ fun ManualLogBottomSheet(
             if (showDateTimePicker) {
                 DateTimePickerDialog(
                     initialTimestampMillis = timestampMillis,
-                    title = "Override Date & Time",
-                    disclaimerText = "Fillmark works best when drinks are tracked in real-time. Only override if you forgot to log a past drink.",
-                    confirmButtonText = "Set Past Time",
+                    title = stringResource(R.string.datetime_override_title),
+                    disclaimerText = stringResource(R.string.manual_log_override_disclaimer),
+                    confirmButtonText = stringResource(R.string.manual_log_set_past_time),
                     onDismiss = { showDateTimePicker = false },
                     onConfirm = { selectedMillis ->
                         timestampMillis = selectedMillis
@@ -305,7 +345,7 @@ fun ManualLogBottomSheet(
 
             Button(
                 onClick = {
-                    if (internalMl > 0) {
+                    if (isVolumeValid) {
                         onLogRecord(
                             internalMl,
                             selectedDrinkType.defaultHydrationFactor,
@@ -314,11 +354,11 @@ fun ManualLogBottomSheet(
                         )
                     }
                 },
-                enabled = internalMl > 0,
+                enabled = isVolumeValid,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Log Intake",
+                    text = stringResource(R.string.manual_log_submit),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -326,4 +366,3 @@ fun ManualLogBottomSheet(
         }
     }
 }
-

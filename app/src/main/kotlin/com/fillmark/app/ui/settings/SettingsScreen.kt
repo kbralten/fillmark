@@ -1,11 +1,18 @@
 package com.fillmark.app.ui.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,20 +29,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,20 +58,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.fillmark.app.BuildConfig
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
+import com.fillmark.app.data.local.ThemeMode
 import com.fillmark.app.sync.HealthConnectManager
+import java.time.LocalDate
+import java.util.Locale
 
-import com.fillmark.app.ui.theme.FillmarkCardBorder
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
-
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
@@ -63,7 +84,22 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
     val hcManager = remember { HealthConnectManager(context) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.statusMessage) {
+        val msg = uiState.statusMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearStatusMessage()
+        }
+    }
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshHealthConnectStatus()
+        onPauseOrDispose {}
+    }
 
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
@@ -74,232 +110,253 @@ fun SettingsScreen(
         }
     }
 
-    var targetInput by remember(uiState.defaultTargetMl, uiState.displayUnit) {
+    var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
+    var showClearDataConfirm by remember { mutableStateOf(false) }
+    var showLicensesDialog by remember { mutableStateOf(false) }
+
+    val exportJsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) viewModel.exportBackupJson(uri)
+    }
+    val restoreJsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) pendingRestoreUri = uri
+    }
+    val exportCsvLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) viewModel.exportLogsCsv(uri)
+    }
+
+    val hasTarget = uiState.defaultTargetMl > 0
+    var targetInput by remember {
         mutableStateOf(
             if (uiState.defaultTargetMl > 0) {
-                VolumeConverter.formatNumberOnly(uiState.defaultTargetMl, uiState.displayUnit)
+                VolumeConverter.formatInputNumber(uiState.defaultTargetMl, uiState.displayUnit)
             } else {
                 if (uiState.displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
             }
         )
     }
+    var lastObservedUnit by remember { mutableStateOf(uiState.displayUnit) }
+    var lastObservedHasTarget by remember { mutableStateOf(hasTarget) }
+
+    LaunchedEffect(uiState.displayUnit, hasTarget, uiState.defaultTargetMl) {
+        if (lastObservedUnit != uiState.displayUnit || lastObservedHasTarget != hasTarget) {
+            if (hasTarget) {
+                targetInput = VolumeConverter.formatInputNumber(uiState.defaultTargetMl, uiState.displayUnit)
+            }
+            lastObservedUnit = uiState.displayUnit
+            lastObservedHasTarget = hasTarget
+        }
+    }
+
+    val parsedTarget = targetInput.toDoubleOrNull() ?: 0.0
+    val targetInternalMl = VolumeConverter.toInternalMl(parsedTarget, uiState.displayUnit)
+    val targetErrorText = when {
+        !hasTarget -> null
+        targetInput.isBlank() || targetInternalMl <= 0 -> stringResource(R.string.error_target_gt_zero)
+        targetInternalMl > VolumeConverter.MAX_DAILY_TARGET_ML -> stringResource(
+            R.string.error_max_daily_target,
+            VolumeConverter.formatVolume(VolumeConverter.MAX_DAILY_TARGET_ML, uiState.displayUnit)
+        )
+        else -> null
+    }
 
     var showWakeTimePicker by remember { mutableStateOf(false) }
     var showSleepTimePicker by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = FillmarkNavyTitle
-        )
+    val privacyUrl = stringResource(R.string.privacy_policy_url)
+    val githubIssuesUrl = stringResource(R.string.github_issues_url)
+    val githubRepoUrl = stringResource(R.string.github_repo_url)
+    val todayLabel = stringResource(R.string.today)
+    val yesterdayLabel = stringResource(R.string.yesterday)
+    val atFormat = stringResource(R.string.date_at_time)
 
-        // Card 1: Units
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, FillmarkCardBorder),
-            modifier = Modifier.fillMaxWidth()
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Display Units",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FilterChip(
-                        selected = uiState.displayUnit == DisplayUnit.METRIC_ML,
-                        onClick = { viewModel.setDisplayUnit(DisplayUnit.METRIC_ML) },
-                        label = { Text("Metric (ml)") }
-                    )
-                    FilterChip(
-                        selected = uiState.displayUnit == DisplayUnit.IMPERIAL_FL_OZ,
-                        onClick = { viewModel.setDisplayUnit(DisplayUnit.IMPERIAL_FL_OZ) },
-                        label = { Text("Imperial (fl oz)") }
-                    )
-                }
-            }
-        }
+            Text(
+                text = stringResource(R.string.settings_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
 
-        // Card 2: Daily Target Goal
-        val hasTarget = uiState.defaultTargetMl > 0
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Daily Target Goal",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = if (hasTarget) "Track intake towards a daily goal" else "No goal set (displays intake in big numbers)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = hasTarget,
-                        onCheckedChange = { isChecked ->
-                            if (isChecked) {
-                                val defaultVal = if (uiState.displayUnit == DisplayUnit.METRIC_ML) 2500.0 else 85.0
-                                viewModel.setDefaultTarget(defaultVal)
-                                targetInput = VolumeConverter.formatNumberOnly(defaultVal, uiState.displayUnit)
-                            } else {
-                                viewModel.setDefaultTarget(0.0)
-                            }
-                        }
+            // Card 1: Appearance
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_appearance),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                }
-
-                if (hasTarget) {
-                    Spacer(modifier = Modifier.height(14.dp))
-                    OutlinedTextField(
-                        value = targetInput,
-                        onValueChange = {
-                            targetInput = it.filter { c -> c.isDigit() || c == '.' }
-                            val num = targetInput.toDoubleOrNull()
-                            if (num != null && num > 0) {
-                                viewModel.setDefaultTarget(num)
-                            }
-                        },
-                        label = { Text("Daily Target") },
-                        suffix = { Text(uiState.displayUnit.symbol) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-
-        // Card 3: Waking Hours Schedule & Pacing
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Waking Hours Pacing",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Calculate expected progress based on waking schedule",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = uiState.wakingPacingEnabled,
-                        onCheckedChange = { isEnabled ->
-                            viewModel.setWakingSchedule(uiState.wakingHoursStart, uiState.wakingHoursEnd, isEnabled)
-                        }
-                    )
-                }
-
-                if (uiState.wakingPacingEnabled) {
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        TimePickerField(
-                            label = "Wake Time",
-                            timeStr = uiState.wakingHoursStart,
-                            onClick = { showWakeTimePicker = true },
-                            modifier = Modifier.weight(1f)
+                        ThemeMode.entries.forEach { mode ->
+                            FilterChip(
+                                selected = uiState.themeMode == mode,
+                                onClick = { viewModel.setThemeMode(mode) },
+                                label = { Text(mode.label) }
+                            )
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.settings_dynamic_color),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_dynamic_color_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = uiState.dynamicColorEnabled,
+                                onCheckedChange = { viewModel.setDynamicColorEnabled(it) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Card 2: Units
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_display_units),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        FilterChip(
+                            selected = uiState.displayUnit == DisplayUnit.METRIC_ML,
+                            onClick = { viewModel.setDisplayUnit(DisplayUnit.METRIC_ML) },
+                            label = { Text(stringResource(R.string.unit_metric_full)) }
                         )
-                        TimePickerField(
-                            label = "Sleep Time",
-                            timeStr = uiState.wakingHoursEnd,
-                            onClick = { showSleepTimePicker = true },
-                            modifier = Modifier.weight(1f)
+                        FilterChip(
+                            selected = uiState.displayUnit == DisplayUnit.IMPERIAL_FL_OZ,
+                            onClick = { viewModel.setDisplayUnit(DisplayUnit.IMPERIAL_FL_OZ) },
+                            label = { Text(stringResource(R.string.unit_imperial_full)) }
                         )
                     }
                 }
             }
-        }
 
-        // Card 4: Health Connect
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Health Connect Integration",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = if (uiState.isHealthConnectAvailable) {
-                        if (uiState.hasHealthConnectPermissions) {
-                            "Status: Connected and ready to sync."
-                        } else {
-                            "Status: Health Connect available. Permissions required."
-                        }
-                    } else {
-                        "Status: Health Connect is not available on this device."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (uiState.hasHealthConnectPermissions) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                if (uiState.isHealthConnectAvailable && !uiState.hasHealthConnectPermissions) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            requestPermissionsLauncher.launch(hcManager.permissions)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Grant Health Connect Permissions")
-                    }
-                }
-
-                if (uiState.isHealthConnectAvailable && uiState.hasHealthConnectPermissions) {
-                    Spacer(modifier = Modifier.height(16.dp))
+            // Card 3: Daily Target Goal & Hydration Factors
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Enable Outbound Sync", style = MaterialTheme.typography.bodyMedium)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.settings_daily_goal),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (hasTarget) {
+                                    stringResource(R.string.settings_daily_goal_desc_on)
+                                } else {
+                                    stringResource(R.string.settings_daily_goal_desc_off)
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Switch(
-                            checked = uiState.healthConnectSyncEnabled,
-                            onCheckedChange = { enabled ->
-                                viewModel.setHealthConnectSync(enabled, uiState.healthConnectBidirectional)
+                            checked = hasTarget,
+                            onCheckedChange = { isChecked ->
+                                if (isChecked) {
+                                    val defaultValInUnit = if (uiState.displayUnit == DisplayUnit.METRIC_ML) 2500.0 else 85.0
+                                    targetInput = if (uiState.displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
+                                    lastObservedHasTarget = true
+                                    viewModel.setDefaultTarget(defaultValInUnit)
+                                } else {
+                                    lastObservedHasTarget = false
+                                    viewModel.setDefaultTargetMl(0.0)
+                                }
                             }
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    if (hasTarget) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        OutlinedTextField(
+                            value = targetInput,
+                            onValueChange = { raw ->
+                                val sanitized = VolumeConverter.sanitizeDecimalInput(raw)
+                                targetInput = sanitized
+                                val num = sanitized.toDoubleOrNull()
+                                if (num != null) {
+                                    val ml = VolumeConverter.toInternalMl(num, uiState.displayUnit)
+                                    if (ml > 0 && ml <= VolumeConverter.MAX_DAILY_TARGET_ML) {
+                                        viewModel.setDefaultTargetMl(ml)
+                                    }
+                                }
+                            },
+                            label = { Text(stringResource(R.string.settings_daily_target_label)) },
+                            suffix = { Text(uiState.displayUnit.symbol) },
+                            singleLine = true,
+                            isError = targetErrorText != null,
+                            supportingText = targetErrorText?.let { msg -> { Text(msg) } },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -307,91 +364,450 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Bidirectional Inbound Sync", style = MaterialTheme.typography.bodyMedium)
                             Text(
-                                "Import drinks logged in other fitness apps into Fillmark",
+                                text = stringResource(R.string.settings_hydration_factors),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (uiState.hydrationFactorsEnabled) {
+                                    stringResource(R.string.settings_hydration_factors_on)
+                                } else {
+                                    stringResource(R.string.settings_hydration_factors_off)
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
-                            checked = uiState.healthConnectBidirectional,
-                            enabled = uiState.healthConnectSyncEnabled,
-                            onCheckedChange = { bi ->
-                                viewModel.setHealthConnectSync(uiState.healthConnectSyncEnabled, bi)
-                            }
+                            checked = uiState.hydrationFactorsEnabled,
+                            onCheckedChange = { viewModel.setHydrationFactorsEnabled(it) }
                         )
                     }
                 }
             }
-        }
 
-        // Card 5: Home Screen Widgets
-        val appWidgetManager = remember { android.appwidget.AppWidgetManager.getInstance(context) }
-        if (appWidgetManager.isRequestPinAppWidgetSupported) {
+            // Card 4: Waking Hours Schedule & Pacing
             Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Home Screen Widgets",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Quickly add Fillmark widgets to your home screen",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = {
-                                val provider = android.content.ComponentName(context, com.fillmark.app.widget.FullDashboardWidgetReceiver::class.java)
-                                appWidgetManager.requestPinAppWidget(provider, null, null)
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Full Widget", style = MaterialTheme.typography.labelMedium)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.settings_waking_pacing),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_waking_pacing_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
+                        Switch(
+                            checked = uiState.wakingPacingEnabled,
+                            onCheckedChange = { isEnabled ->
+                                viewModel.setWakingSchedule(uiState.wakingHoursStart, uiState.wakingHoursEnd, isEnabled)
+                            }
+                        )
+                    }
 
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = {
-                                val provider = android.content.ComponentName(context, com.fillmark.app.widget.ProgressMeterWidgetReceiver::class.java)
-                                appWidgetManager.requestPinAppWidget(provider, null, null)
-                            },
-                            modifier = Modifier.weight(1f)
+                    if (uiState.wakingPacingEnabled) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text("Progress (3x1)", style = MaterialTheme.typography.labelMedium)
-                        }
-
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = {
-                                val provider = android.content.ComponentName(context, com.fillmark.app.widget.QuickLogBarWidgetReceiver::class.java)
-                                appWidgetManager.requestPinAppWidget(provider, null, null)
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Quick Bar", style = MaterialTheme.typography.labelMedium)
+                            TimePickerField(
+                                label = stringResource(R.string.settings_wake_time),
+                                timeStr = uiState.wakingHoursStart,
+                                onClick = { showWakeTimePicker = true },
+                                modifier = Modifier.weight(1f)
+                            )
+                            TimePickerField(
+                                label = stringResource(R.string.settings_sleep_time),
+                                timeStr = uiState.wakingHoursEnd,
+                                onClick = { showSleepTimePicker = true },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(32.dp))
+            // Card 5: Health Connect
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_hc_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = when {
+                            uiState.isHealthConnectAvailable && uiState.hasHealthConnectPermissions ->
+                                stringResource(R.string.settings_hc_connected)
+                            uiState.isHealthConnectAvailable ->
+                                stringResource(R.string.settings_hc_needs_perms)
+                            uiState.healthConnectSdkStatus == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
+                                stringResource(R.string.settings_hc_update_required)
+                            else ->
+                                stringResource(R.string.settings_hc_unavailable)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (uiState.hasHealthConnectPermissions) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+
+                    if (uiState.healthConnectSdkStatus == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                val marketIntent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("market://details?id=com.google.android.apps.healthdata")
+                                ).apply {
+                                    setPackage("com.android.vending")
+                                }
+                                runCatching { context.startActivity(marketIntent) }
+                                    .onFailure {
+                                        runCatching {
+                                            context.startActivity(
+                                                Intent(
+                                                    Intent.ACTION_VIEW,
+                                                    Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata")
+                                                )
+                                            )
+                                        }
+                                    }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.settings_hc_install_update))
+                        }
+                    } else if (uiState.isHealthConnectAvailable && !uiState.hasHealthConnectPermissions) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                requestPermissionsLauncher.launch(hcManager.permissions)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.settings_hc_grant_perms))
+                        }
+                    }
+
+                    if (uiState.isHealthConnectAvailable && uiState.hasHealthConnectPermissions) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_hc_outbound_sync),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Switch(
+                                checked = uiState.healthConnectSyncEnabled,
+                                onCheckedChange = { enabled ->
+                                    viewModel.setHealthConnectSync(enabled, uiState.healthConnectBidirectional)
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.settings_hc_inbound_sync),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_hc_inbound_sync_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = uiState.healthConnectBidirectional,
+                                enabled = uiState.healthConnectSyncEnabled,
+                                onCheckedChange = { bi ->
+                                    viewModel.setHealthConnectSync(uiState.healthConnectSyncEnabled, bi)
+                                }
+                            )
+                        }
+
+                        if (uiState.healthConnectSyncEnabled) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            val lastSyncText = if (uiState.lastHealthConnectSyncMillis > 0L) {
+                                val formatted = TimeUtils.formatDateTime(
+                                    epochMillis = uiState.lastHealthConnectSyncMillis,
+                                    is24Hour = is24Hour,
+                                    todayLabel = todayLabel,
+                                    yesterdayLabel = yesterdayLabel,
+                                    atFormat = atFormat
+                                )
+                                stringResource(R.string.settings_hc_last_synced, formatted)
+                            } else {
+                                stringResource(R.string.settings_hc_last_synced_never)
+                            }
+                            Text(
+                                text = lastSyncText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.syncHealthConnectNow() },
+                                enabled = !uiState.isSyncingHealthConnect,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (uiState.isSyncingHealthConnect) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.settings_hc_syncing))
+                                } else {
+                                    Text(stringResource(R.string.settings_hc_sync_now))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Card 6: Data & Backup
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_data_backup),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_data_backup_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { exportJsonLauncher.launch("fillmark-backup-${LocalDate.now()}.json") },
+                            enabled = !uiState.isBackupBusy,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.settings_export_json))
+                        }
+                        OutlinedButton(
+                            onClick = { restoreJsonLauncher.launch(arrayOf("application/json", "*/*")) },
+                            enabled = !uiState.isBackupBusy,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.settings_restore_json))
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { exportCsvLauncher.launch("fillmark-logs-${LocalDate.now()}.csv") },
+                        enabled = !uiState.isBackupBusy,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.settings_export_csv))
+                    }
+                    TextButton(
+                        onClick = { showClearDataConfirm = true },
+                        enabled = !uiState.isBackupBusy,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.settings_clear_all))
+                    }
+                }
+            }
+
+            // Card 7: Home Screen Widgets
+            val appWidgetManager = remember { android.appwidget.AppWidgetManager.getInstance(context) }
+            if (appWidgetManager.isRequestPinAppWidgetSupported) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_widgets_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.settings_widgets_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val provider = android.content.ComponentName(
+                                        context,
+                                        com.fillmark.app.widget.FullDashboardWidgetReceiver::class.java
+                                    )
+                                    appWidgetManager.requestPinAppWidget(provider, null, null)
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(R.string.settings_widget_full), style = MaterialTheme.typography.labelMedium)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val provider = android.content.ComponentName(
+                                        context,
+                                        com.fillmark.app.widget.ProgressMeterWidgetReceiver::class.java
+                                    )
+                                    appWidgetManager.requestPinAppWidget(provider, null, null)
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(R.string.settings_widget_progress), style = MaterialTheme.typography.labelMedium)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val provider = android.content.ComponentName(
+                                        context,
+                                        com.fillmark.app.widget.QuickLogBarWidgetReceiver::class.java
+                                    )
+                                    appWidgetManager.requestPinAppWidget(provider, null, null)
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(R.string.settings_widget_quick_bar), style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Card 8: About Fillmark
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_about_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.settings_version_format,
+                            BuildConfig.VERSION_NAME,
+                            BuildConfig.VERSION_CODE
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.wellness_disclaimer),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.settings_privacy_policy), style = MaterialTheme.typography.labelMedium)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(githubIssuesUrl)))
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.settings_report_bug), style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    TextButton(
+                        onClick = { showLicensesDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.settings_open_source_license))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+        }
     }
 
     if (showWakeTimePicker) {
         TimePickerModalDialog(
-            title = "Set Wake Time",
+            title = stringResource(R.string.settings_set_wake_time),
             initialTime = uiState.wakingHoursStart,
             onDismiss = { showWakeTimePicker = false },
             onConfirm = { newTime ->
@@ -403,12 +819,92 @@ fun SettingsScreen(
 
     if (showSleepTimePicker) {
         TimePickerModalDialog(
-            title = "Set Sleep Time",
+            title = stringResource(R.string.settings_set_sleep_time),
             initialTime = uiState.wakingHoursEnd,
             onDismiss = { showSleepTimePicker = false },
             onConfirm = { newTime ->
                 viewModel.setWakingSchedule(uiState.wakingHoursStart, newTime, uiState.wakingPacingEnabled)
                 showSleepTimePicker = false
+            }
+        )
+    }
+
+    pendingRestoreUri?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { pendingRestoreUri = null },
+            title = { Text(stringResource(R.string.settings_restore_confirm_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.settings_restore_confirm_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.restoreBackupJson(uri)
+                        pendingRestoreUri = null
+                    }
+                ) {
+                    Text(stringResource(R.string.action_restore))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingRestoreUri = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    if (showClearDataConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearDataConfirm = false },
+            title = { Text(stringResource(R.string.settings_clear_confirm_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.settings_clear_confirm_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearAllData()
+                        showClearDataConfirm = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(stringResource(R.string.settings_delete_everything))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showClearDataConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    if (showLicensesDialog) {
+        AlertDialog(
+            onDismissRequest = { showLicensesDialog = false },
+            title = { Text(stringResource(R.string.settings_license_dialog_title), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.settings_license_dialog_gpl))
+                    Text(
+                        text = stringResource(R.string.settings_license_dialog_libs),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showLicensesDialog = false }) {
+                    Text(stringResource(R.string.action_close))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(githubRepoUrl)))
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_source_code))
+                }
             }
         )
     }
@@ -421,6 +917,9 @@ fun TimePickerField(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
+
     Surface(
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -440,14 +939,14 @@ fun TimePickerField(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = TimeUtils.formatTimeString(timeStr),
+                    text = TimeUtils.formatTimeString(timeStr, is24Hour = is24Hour),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Icon(
                     imageVector = Icons.Default.Schedule,
-                    contentDescription = "Pick $label",
+                    contentDescription = stringResource(R.string.settings_pick_time_cd, label),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -464,11 +963,13 @@ fun TimePickerModalDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
     val initialLocalTime = TimeUtils.parseTimeString(initialTime)
     val timePickerState = rememberTimePickerState(
         initialHour = initialLocalTime.hour,
         initialMinute = initialLocalTime.minute,
-        is24Hour = false
+        is24Hour = is24Hour
     )
 
     AlertDialog(
@@ -491,18 +992,17 @@ fun TimePickerModalDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val formatted = String.format(java.util.Locale.US, "%02d:%02d", timePickerState.hour, timePickerState.minute)
+                    val formatted = String.format(Locale.US, "%02d:%02d", timePickerState.hour, timePickerState.minute)
                     onConfirm(formatted)
                 }
             ) {
-                Text("OK")
+                Text(stringResource(R.string.action_ok))
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
 }
-

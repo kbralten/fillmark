@@ -53,6 +53,7 @@ android {
     targetSdk = 36
     versionCode = buildNumber
     versionName = versionNameProp
+    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   buildTypes {
@@ -75,7 +76,7 @@ android {
   buildFeatures {
     compose = true
     aidl = false
-    buildConfig = false
+    buildConfig = true
     shaders = false
   }
 
@@ -90,6 +91,15 @@ kotlin {
   jvmToolchain(17)
 }
 
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+// Prevent concurrent KSP variant tasks from racing on the shared Room schema JSON file
+tasks.matching { it.name == "kspReleaseKotlin" }.configureEach {
+  mustRunAfter(tasks.matching { it.name == "kspDebugKotlin" })
+}
+
 dependencies {
   val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
@@ -97,8 +107,10 @@ dependencies {
 
   // Core Android dependencies
   implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.core.splashscreen)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
+  implementation(libs.kotlinx.serialization.json)
 
   // Arch Components
   implementation(libs.androidx.lifecycle.runtime.compose)
@@ -124,11 +136,6 @@ dependencies {
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.espresso.core)
-
-  // Navigation
-  implementation(libs.androidx.navigation3.ui)
-  implementation(libs.androidx.navigation3.runtime)
-  implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 
   // Room Persistence
   implementation(libs.room.runtime)

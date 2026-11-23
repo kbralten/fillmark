@@ -3,10 +3,12 @@ package com.fillmark.app.ui.history
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.data.repository.HydrationRepository
+import com.fillmark.app.sync.HealthConnectManager
 import com.fillmark.app.widget.WidgetUpdateHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 data class DayGroup(
     val dateIso: String,
@@ -25,6 +28,7 @@ data class DayGroup(
 data class HistoryUiState(
     val dayGroups: List<DayGroup> = emptyList(),
     val displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
+    val hydrationFactorsEnabled: Boolean = true,
     val editingRecord: HydrationRecordEntity? = null,
     val recentlyDeletedRecord: HydrationRecordEntity? = null,
     val snackbarMessage: String? = null
@@ -38,21 +42,29 @@ class HistoryViewModel @JvmOverloads constructor(
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
+    private val currentDateFlow = MutableStateFlow(LocalDate.now())
+
     init {
         viewModelScope.launch {
-            android.util.Log.d("HistoryViewModel", "Starting flow observation...")
             combine(
                 repository.observeAllRecords(),
-                repository.preferencesFlow
-            ) { records, prefs ->
-                android.util.Log.d("HistoryViewModel", "Emitted: records count=${records.size}, unit=${prefs.displayUnit}")
+                repository.preferencesFlow,
+                currentDateFlow
+            ) { records, prefs, _ ->
+                val todayLabel = getApplication<Application>().getString(R.string.today)
+                val yesterdayLabel = getApplication<Application>().getString(R.string.yesterday)
+                val factorsEnabled = prefs.hydrationFactorsEnabled
                 val grouped = records
                     .groupBy { TimeUtils.toIsoDate(it.timestamp) }
                     .map { (dateIso, groupRecords) ->
                         DayGroup(
                             dateIso = dateIso,
-                            friendlyDate = TimeUtils.formatFriendlyDate(dateIso),
-                            totalEffectiveVolumeMl = groupRecords.sumOf { it.effectiveVolumeMl },
+                            friendlyDate = TimeUtils.formatFriendlyDate(
+                                dateString = dateIso,
+                                todayLabel = todayLabel,
+                                yesterdayLabel = yesterdayLabel
+                            ),
+                            totalEffectiveVolumeMl = groupRecords.sumOf { it.countedVolumeMl(factorsEnabled) },
                             records = groupRecords.sortedByDescending { it.timestamp }
                         )
                     }
@@ -61,13 +73,16 @@ class HistoryViewModel @JvmOverloads constructor(
                 _uiState.update {
                     it.copy(
                         dayGroups = grouped,
-                        displayUnit = prefs.displayUnit
+                        displayUnit = prefs.displayUnit,
+                        hydrationFactorsEnabled = factorsEnabled
                     )
                 }
-            }.collect {
-                android.util.Log.d("HistoryViewModel", "Collected state update")
-            }
+            }.collect {}
         }
+    }
+
+    fun refreshCurrentDate() {
+        currentDateFlow.value = LocalDate.now()
     }
 
     fun startEditing(record: HydrationRecordEntity) {
@@ -93,7 +108,7 @@ class HistoryViewModel @JvmOverloads constructor(
             _uiState.update {
                 it.copy(
                     recentlyDeletedRecord = record,
-                    snackbarMessage = "Record deleted"
+                    snackbarMessage = getApplication<Application>().getString(R.string.record_deleted)
                 )
             }
         }
@@ -102,14 +117,13 @@ class HistoryViewModel @JvmOverloads constructor(
     fun undoDelete() {
         val record = _uiState.value.recentlyDeletedRecord ?: return
         viewModelScope.launch {
-            repository.insertRecord(record)
+            repository.insertRecord(HealthConnectManager.prepareRestoredEntityForResync(record))
             WidgetUpdateHelper.updateAllWidgets(getApplication())
             _uiState.update { it.copy(recentlyDeletedRecord = null, snackbarMessage = null) }
         }
     }
 
     fun clearSnackbar() {
-        _uiState.update { it.copy(snackbarMessage = null) }
+        _uiState.update { it.copy(recentlyDeletedRecord = null, snackbarMessage = null) }
     }
 }
-

@@ -2,7 +2,6 @@ package com.fillmark.app.core
 
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -10,15 +9,29 @@ import java.util.Locale
 
 object TimeUtils {
     private val ISO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
-    private val TIME_FORMATTER = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
-    private val SHORT_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)
-    private val MONTH_DAY_FORMATTER = DateTimeFormatter.ofPattern("MMM d", Locale.US)
-    private val FULL_DATE_FORMATTER = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
 
-    fun formatCurrentDateHeader(zoneId: ZoneId = ZoneId.systemDefault()): String {
+    private fun timeFormatter(is24Hour: Boolean, locale: Locale): DateTimeFormatter {
+        val pattern = if (is24Hour) "HH:mm" else "h:mm a"
+        return DateTimeFormatter.ofPattern(pattern, locale)
+    }
+
+    private fun shortDateFormatter(locale: Locale): DateTimeFormatter =
+        DateTimeFormatter.ofPattern("EEE, MMM d", locale)
+
+    private fun monthDayFormatter(locale: Locale): DateTimeFormatter =
+        DateTimeFormatter.ofPattern("MMM d", locale)
+
+    private fun fullDateFormatter(locale: Locale): DateTimeFormatter =
+        DateTimeFormatter.ofPattern("MMM d, yyyy", locale)
+
+    fun formatCurrentDateHeader(
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        locale: Locale = Locale.getDefault(),
+        todayLabel: String = "Today"
+    ): String {
         val date = LocalDate.now(zoneId)
-        val monthDay = date.format(MONTH_DAY_FORMATTER)
-        return "Today, $monthDay"
+        val monthDay = date.format(monthDayFormatter(locale))
+        return "$todayLabel, $monthDay"
     }
 
     fun currentDateIso(zoneId: ZoneId = ZoneId.systemDefault()): String {
@@ -58,44 +71,67 @@ object TimeUtils {
         return date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
     }
 
-    fun formatTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
+    fun formatTime(
+        epochMillis: Long,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        is24Hour: Boolean = false,
+        locale: Locale = Locale.getDefault()
+    ): String {
         val time = Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalTime()
-        return time.format(TIME_FORMATTER)
+        return time.format(timeFormatter(is24Hour, locale))
     }
 
-    fun formatTime(time: LocalTime): String {
-        return time.format(TIME_FORMATTER)
+    fun formatTime(
+        time: LocalTime,
+        is24Hour: Boolean = false,
+        locale: Locale = Locale.getDefault()
+    ): String {
+        return time.format(timeFormatter(is24Hour, locale))
     }
 
-    fun formatFullDate(date: LocalDate): String {
-        return date.format(FULL_DATE_FORMATTER)
+    fun formatFullDate(date: LocalDate, locale: Locale = Locale.getDefault()): String {
+        return date.format(fullDateFormatter(locale))
     }
 
-    fun formatDateTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
+    fun formatDateTime(
+        epochMillis: Long,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        is24Hour: Boolean = false,
+        locale: Locale = Locale.getDefault(),
+        todayLabel: String = "Today",
+        yesterdayLabel: String = "Yesterday",
+        atFormat: String = "%1\$s at %2\$s"
+    ): String {
         val date = toLocalDate(epochMillis, zoneId)
-        val timeStr = formatTime(epochMillis, zoneId)
+        val timeStr = formatTime(epochMillis, zoneId, is24Hour, locale)
         val today = LocalDate.now(zoneId)
         val dateStr = when (date) {
-            today -> "Today"
-            today.minusDays(1) -> "Yesterday"
-            else -> date.format(FULL_DATE_FORMATTER)
+            today -> todayLabel
+            today.minusDays(1) -> yesterdayLabel
+            else -> date.format(fullDateFormatter(locale))
         }
-        return "$dateStr at $timeStr"
+        return String.format(locale, atFormat, dateStr, timeStr)
     }
 
-    fun formatFriendlyDate(dateString: String, zoneId: ZoneId = ZoneId.systemDefault()): String {
+    fun formatFriendlyDate(
+        dateString: String,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        locale: Locale = Locale.getDefault(),
+        todayLabel: String = "Today",
+        yesterdayLabel: String = "Yesterday"
+    ): String {
         val date = LocalDate.parse(dateString, ISO_DATE_FORMATTER)
         val today = LocalDate.now(zoneId)
         return when (date) {
-            today -> "Today"
-            today.minusDays(1) -> "Yesterday"
-            else -> date.format(SHORT_DATE_FORMATTER)
+            today -> todayLabel
+            today.minusDays(1) -> yesterdayLabel
+            else -> date.format(shortDateFormatter(locale))
         }
     }
 
-    fun formatShortDate(dateString: String): String {
+    fun formatShortDate(dateString: String, locale: Locale = Locale.getDefault()): String {
         val date = LocalDate.parse(dateString, ISO_DATE_FORMATTER)
-        return date.format(MONTH_DAY_FORMATTER)
+        return date.format(monthDayFormatter(locale))
     }
 
     fun parseTimeString(timeStr: String): LocalTime {
@@ -105,8 +141,11 @@ object TimeUtils {
         return LocalTime.of(hour.coerceIn(0, 23), minute.coerceIn(0, 59))
     }
 
-    fun formatTimeString(timeStr: String): String {
-        return parseTimeString(timeStr).format(TIME_FORMATTER)
+    fun formatTimeString(
+        timeStr: String,
+        is24Hour: Boolean = false,
+        locale: Locale = Locale.getDefault()
+    ): String {
+        return parseTimeString(timeStr).format(timeFormatter(is24Hour, locale))
     }
 }
-

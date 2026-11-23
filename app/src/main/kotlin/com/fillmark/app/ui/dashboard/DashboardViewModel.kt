@@ -3,43 +3,57 @@ package com.fillmark.app.ui.dashboard
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.DrinkType
+import com.fillmark.app.core.PresetIcon
+import com.fillmark.app.core.ShortcutHelper
 import com.fillmark.app.core.TimeUtils
-import com.fillmark.app.data.local.UserPreferences
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.data.local.entity.PresetEntity
 import com.fillmark.app.data.repository.HydrationRepository
 import com.fillmark.app.domain.PacingCalculator
 import com.fillmark.app.domain.PacingResult
+import com.fillmark.app.sync.HealthConnectManager
 import com.fillmark.app.widget.WidgetUpdateHelper
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalTime
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 data class DashboardUiState(
+    val dateHeader: String = TimeUtils.formatCurrentDateHeader(),
     val effectiveVolumeMl: Double = 0.0,
     val targetMl: Double = 2500.0,
+    val defaultTargetMl: Double = 2500.0,
+    val isTargetOverridden: Boolean = false,
+    val hydrationFactorsEnabled: Boolean = true,
     val displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
     val presets: List<PresetEntity> = emptyList(),
     val todayRecords: List<HydrationRecordEntity> = emptyList(),
     val pacingResult: PacingResult? = null,
     val isManualLogSheetOpen: Boolean = false,
+    val isTodayTargetDialogOpen: Boolean = false,
+    val editingRecord: HydrationRecordEntity? = null,
     val lastLoggedRecord: HydrationRecordEntity? = null,
+    val recentlyDeletedRecord: HydrationRecordEntity? = null,
     val snackbarMessage: String? = null,
     val editingPreset: PresetEntity? = null,
     val isPresetEditorOpen: Boolean = false,
     val isCustomizePresetsOpen: Boolean = false
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel @JvmOverloads constructor(
     application: Application,
     private val repository: HydrationRepository = HydrationRepository(application)
@@ -48,18 +62,34 @@ class DashboardViewModel @JvmOverloads constructor(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    private val currentTimeTicker = MutableStateFlow(ZonedDateTime.now())
     private var undoJob: Job? = null
 
     init {
         viewModelScope.launch {
+            while (true) {
+                delay(60_000L)
+                currentTimeTicker.value = ZonedDateTime.now()
+            }
+        }
+
+        val todaySummaryFlow = currentTimeTicker
+            .map { it.toLocalDate() }
+            .distinctUntilChanged()
+            .flatMapLatest { date ->
+                repository.observeSummaryForDate(date)
+            }
+
+        viewModelScope.launch {
             combine(
-                repository.observeTodaySummary(),
+                todaySummaryFlow,
                 repository.observePresets(),
-                repository.preferencesFlow
-            ) { summary, presets, prefs ->
+                repository.preferencesFlow,
+                currentTimeTicker
+            ) { summary, presets, prefs, now ->
                 val pacing = if (prefs.wakingPacingEnabled && summary.targetMl > 0) {
                     PacingCalculator.evaluatePacing(
-                        currentTime = LocalTime.now(),
+                        currentTime = now.toLocalTime(),
                         wakeTimeString = prefs.wakingHoursStart,
                         sleepTimeString = prefs.wakingHoursEnd,
                         currentVolumeMl = summary.effectiveVolumeMl,
@@ -70,10 +100,15 @@ class DashboardViewModel @JvmOverloads constructor(
                     null
                 }
 
+                val todayLabel = getApplication<Application>().getString(R.string.today)
                 _uiState.update { current ->
                     current.copy(
+                        dateHeader = TimeUtils.formatCurrentDateHeader(now.zone, todayLabel = todayLabel),
                         effectiveVolumeMl = summary.effectiveVolumeMl,
                         targetMl = summary.targetMl,
+                        defaultTargetMl = summary.defaultTargetMl,
+                        isTargetOverridden = summary.isTargetOverridden,
+                        hydrationFactorsEnabled = summary.hydrationFactorsEnabled,
                         displayUnit = prefs.displayUnit,
                         presets = presets,
                         todayRecords = summary.records,
@@ -84,48 +119,160 @@ class DashboardViewModel @JvmOverloads constructor(
         }
     }
 
+    fun refreshCurrentTime() {
+        currentTimeTicker.value = ZonedDateTime.now()
+    }
+
     fun logPreset(preset: PresetEntity) {
         viewModelScope.launch {
             val record = repository.logPreset(preset)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
-            showUndoSnackbar(record, "Added ${preset.label}")
+            showUndoSnackbar(
+                loggedRecord = record,
+                deletedRecord = null,
+                message = getApplication<Application>().getString(R.string.dashboard_added_preset, preset.label)
+            )
+        }
+    }
+
+    fun logPresetById(presetId: String) {
+        viewModelScope.launch {
+            val preset = repository.getPresets().firstOrNull { it.id == presetId } ?: return@launch
+            val record = repository.logPreset(preset)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            showUndoSnackbar(
+                loggedRecord = record,
+                deletedRecord = null,
+                message = getApplication<Application>().getString(R.string.dashboard_added_preset, preset.label)
+            )
         }
     }
 
     fun logCustom(volumeMl: Double, hydrationFactor: Double, drinkType: String, timestamp: Long) {
         viewModelScope.launch {
+            val type = DrinkType.fromId(drinkType)
             val record = HydrationRecordEntity(
                 timestamp = timestamp,
                 volumeMl = volumeMl,
                 hydrationFactor = hydrationFactor,
                 drinkType = drinkType,
-                iconKey = null
+                iconKey = PresetIcon.defaultForDrinkType(type).id
             )
             repository.insertRecord(record)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
             _uiState.update { it.copy(isManualLogSheetOpen = false) }
-            showUndoSnackbar(record, "Logged ${drinkType.lowercase().replaceFirstChar { it.uppercase() }}")
+            showUndoSnackbar(
+                loggedRecord = record,
+                deletedRecord = null,
+                message = getApplication<Application>().getString(
+                    R.string.dashboard_logged_drink,
+                    drinkType.lowercase().replaceFirstChar { it.uppercase() }
+                )
+            )
+        }
+    }
+
+    fun openTodayTargetDialog() {
+        _uiState.update { it.copy(isTodayTargetDialogOpen = true) }
+    }
+
+    fun dismissTodayTargetDialog() {
+        _uiState.update { it.copy(isTodayTargetDialogOpen = false) }
+    }
+
+    fun setTodayTargetOverride(targetMl: Double) {
+        viewModelScope.launch {
+            val todayIso = currentTimeTicker.value.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+            repository.setTargetForDate(todayIso, targetMl)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            _uiState.update { it.copy(isTodayTargetDialogOpen = false) }
+        }
+    }
+
+    fun resetTodayTargetToDefault() {
+        viewModelScope.launch {
+            val todayIso = currentTimeTicker.value.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+            repository.clearTargetOverrideForDate(todayIso)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            _uiState.update { it.copy(isTodayTargetDialogOpen = false) }
+        }
+    }
+
+    fun startEditingRecord(record: HydrationRecordEntity) {
+        _uiState.update { it.copy(editingRecord = record) }
+    }
+
+    fun dismissEditingRecord() {
+        _uiState.update { it.copy(editingRecord = null) }
+    }
+
+    fun saveEditedRecord(record: HydrationRecordEntity) {
+        viewModelScope.launch {
+            repository.updateRecord(record)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            _uiState.update { it.copy(editingRecord = null) }
+        }
+    }
+
+    fun deleteRecord(record: HydrationRecordEntity) {
+        viewModelScope.launch {
+            repository.deleteRecordById(record.id)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            _uiState.update { it.copy(editingRecord = null) }
+            showUndoSnackbar(
+                loggedRecord = null,
+                deletedRecord = record,
+                message = getApplication<Application>().getString(R.string.record_deleted)
+            )
         }
     }
 
     fun undoLastLog() {
-        val last = _uiState.value.lastLoggedRecord ?: return
+        val state = _uiState.value
+        val logged = state.lastLoggedRecord
+        val deleted = state.recentlyDeletedRecord
         viewModelScope.launch {
-            repository.deleteRecordById(last.id)
+            if (logged != null) {
+                repository.deleteRecordById(logged.id)
+            } else if (deleted != null) {
+                repository.insertRecord(HealthConnectManager.prepareRestoredEntityForResync(deleted))
+            }
             WidgetUpdateHelper.updateAllWidgets(getApplication())
-            _uiState.update { it.copy(lastLoggedRecord = null, snackbarMessage = null) }
+            _uiState.update {
+                it.copy(
+                    lastLoggedRecord = null,
+                    recentlyDeletedRecord = null,
+                    snackbarMessage = null
+                )
+            }
         }
     }
 
-    private fun showUndoSnackbar(record: HydrationRecordEntity, message: String) {
+    private fun showUndoSnackbar(
+        loggedRecord: HydrationRecordEntity?,
+        deletedRecord: HydrationRecordEntity?,
+        message: String
+    ) {
         undoJob?.cancel()
-        _uiState.update { it.copy(lastLoggedRecord = record, snackbarMessage = message) }
+        val actionId = loggedRecord?.id ?: deletedRecord?.id
+        _uiState.update {
+            it.copy(
+                lastLoggedRecord = loggedRecord,
+                recentlyDeletedRecord = deletedRecord,
+                snackbarMessage = message
+            )
+        }
 
         undoJob = viewModelScope.launch {
-            delay(4000) // 4 seconds undo window
+            delay(4000)
             _uiState.update {
-                if (it.lastLoggedRecord?.id == record.id) {
-                    it.copy(lastLoggedRecord = null, snackbarMessage = null)
+                val currentActionId = it.lastLoggedRecord?.id ?: it.recentlyDeletedRecord?.id
+                if (currentActionId == actionId) {
+                    it.copy(
+                        lastLoggedRecord = null,
+                        recentlyDeletedRecord = null,
+                        snackbarMessage = null
+                    )
                 } else {
                     it
                 }
@@ -142,7 +289,13 @@ class DashboardViewModel @JvmOverloads constructor(
     }
 
     fun clearSnackbar() {
-        _uiState.update { it.copy(snackbarMessage = null) }
+        _uiState.update {
+            it.copy(
+                lastLoggedRecord = null,
+                recentlyDeletedRecord = null,
+                snackbarMessage = null
+            )
+        }
     }
 
     fun openAddPreset() {
@@ -161,6 +314,7 @@ class DashboardViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             repository.reorderPresets(orderedPresets)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
+            ShortcutHelper.updateShortcuts(getApplication())
         }
     }
 
@@ -181,6 +335,7 @@ class DashboardViewModel @JvmOverloads constructor(
                 repository.addPreset(preset)
             }
             WidgetUpdateHelper.updateAllWidgets(getApplication())
+            ShortcutHelper.updateShortcuts(getApplication())
             dismissPresetEditor()
         }
     }
@@ -189,8 +344,8 @@ class DashboardViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             repository.deletePreset(presetId)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
+            ShortcutHelper.updateShortcuts(getApplication())
             dismissPresetEditor()
         }
     }
 }
-
