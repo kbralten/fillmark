@@ -50,19 +50,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.domain.DailyGraphMode
 import com.fillmark.app.domain.DailyLineChartData
 import com.fillmark.app.ui.analytics.components.BarChart
 import com.fillmark.app.ui.analytics.components.DailyLineChart
-import com.fillmark.app.ui.theme.FillmarkCardBorder
 import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkCyanDark
 import com.fillmark.app.ui.theme.FillmarkNavy700
 import com.fillmark.app.ui.theme.FillmarkNavy800
 import com.fillmark.app.ui.theme.FillmarkNavy900
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
 import com.fillmark.app.ui.theme.FillmarkSlateMuted
 import kotlin.math.roundToInt
 
@@ -72,6 +70,11 @@ fun AnalyticsScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshCurrentDate()
+        onPauseOrDispose {}
+    }
 
     Column(
         modifier = modifier
@@ -85,14 +88,14 @@ fun AnalyticsScreen(
             text = "Drink Analytics",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
-            color = FillmarkNavyTitle
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         // Interval Tabs
         SecondaryTabRow(
             selectedTabIndex = uiState.selectedInterval.ordinal,
             containerColor = Color.Transparent,
-            contentColor = FillmarkNavyTitle,
+            contentColor = MaterialTheme.colorScheme.onBackground,
             divider = {}
         ) {
             AnalyticsInterval.entries.forEach { interval ->
@@ -105,7 +108,7 @@ fun AnalyticsScreen(
                             text = interval.label,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) FillmarkNavyTitle else FillmarkSlateMuted
+                            color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 )
@@ -285,7 +288,7 @@ private fun MetricCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, FillmarkCardBorder),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = modifier
     ) {
         Column(
@@ -302,12 +305,12 @@ private fun MetricCard(
                     text = title,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
-                    color = FillmarkSlateMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = FillmarkNavyTitle.copy(alpha = 0.75f),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -316,14 +319,14 @@ private fun MetricCard(
                 text = value,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
-                color = FillmarkNavyTitle
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (subtitle != null) {
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
-                    color = FillmarkSlateMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -476,7 +479,7 @@ private fun PeriodNavigationBar(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.NavigateBefore,
                 contentDescription = "Previous period",
-                tint = FillmarkNavyTitle,
+                tint = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -486,7 +489,7 @@ private fun PeriodNavigationBar(
             text = periodLabel,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            color = FillmarkNavyTitle
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Row(
@@ -502,7 +505,7 @@ private fun PeriodNavigationBar(
                     Icon(
                         imageVector = Icons.Outlined.Today,
                         contentDescription = "Jump to current period",
-                        tint = FillmarkCyanDark,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -517,7 +520,7 @@ private fun PeriodNavigationBar(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.NavigateNext,
                     contentDescription = "Next period",
-                    tint = if (canGoNext) FillmarkNavyTitle else FillmarkSlateMuted.copy(alpha = 0.3f),
+                    tint = if (canGoNext) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                     modifier = Modifier.size(22.dp)
                 )
             }

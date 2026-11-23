@@ -51,7 +51,10 @@ fun BarChart(
         val barCount = bars.size
         val barSpacing = (chartWidth / barCount) * 0.22f
         val barWidth = (chartWidth / barCount) - barSpacing
-        val cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+        val cornerPx = minOf(10.dp.toPx(), barWidth / 2f)
+        val cornerRadius = CornerRadius(cornerPx, cornerPx)
+        val badgeWidth = 28.dp.toPx()
+        val showBadges = barWidth >= badgeWidth
 
         // 1. Subtle horizontal dashed target line
         val avgTarget = bars.map { it.targetMl }.average()
@@ -99,43 +102,44 @@ fun BarChart(
                     cornerRadius = cornerRadius
                 )
 
-                // Accent percentage badge for days featuring historical data
-                val pct = if (bar.targetMl > 0) {
-                    ((bar.valueMl / bar.targetMl) * 100).roundToInt()
-                } else 100
+                // Accent percentage badge when bars are wide enough to render cleanly
+                if (showBadges) {
+                    val pct = if (bar.targetMl > 0) {
+                        ((bar.valueMl / bar.targetMl) * 100).roundToInt()
+                    } else 100
 
-                val isHighOrCurrent = pct >= 50 || bar.isCurrent
-                val badgeBgColor = if (isHighOrCurrent) FillmarkCyan else Color(0xFFF5A67B)
-                val badgeWidth = 28.dp.toPx()
-                val badgeHeight = 15.dp.toPx()
-                val badgeCorner = CornerRadius(7.5.dp.toPx(), 7.5.dp.toPx())
-                val badgeCenterX = left + barWidth / 2f
-                val badgeLeft = badgeCenterX - badgeWidth / 2f
+                    val isHighOrCurrent = pct >= 50 || bar.isCurrent
+                    val badgeBgColor = if (isHighOrCurrent) FillmarkCyan else Color(0xFFF5A67B)
+                    val badgeHeight = 15.dp.toPx()
+                    val badgeCorner = CornerRadius(7.5.dp.toPx(), 7.5.dp.toPx())
+                    val badgeCenterX = left + barWidth / 2f
+                    val badgeLeft = badgeCenterX - badgeWidth / 2f
 
-                // Position badge right at the fill boundary or slightly offset
-                val badgeTop = (top - badgeHeight / 2f).coerceIn(2.dp.toPx(), chartHeight - badgeHeight - 2.dp.toPx())
+                    // Position badge right at the fill boundary or slightly offset
+                    val badgeTop = (top - badgeHeight / 2f).coerceIn(2.dp.toPx(), chartHeight - badgeHeight - 2.dp.toPx())
 
-                drawRoundRect(
-                    color = badgeBgColor,
-                    topLeft = Offset(badgeLeft, badgeTop),
-                    size = Size(badgeWidth, badgeHeight),
-                    cornerRadius = badgeCorner
-                )
+                    drawRoundRect(
+                        color = badgeBgColor,
+                        topLeft = Offset(badgeLeft, badgeTop),
+                        size = Size(badgeWidth, badgeHeight),
+                        cornerRadius = badgeCorner
+                    )
 
-                // Draw percentage text inside badge
-                val badgeTextPaint = android.graphics.Paint().apply {
-                    color = badgeNavyColorInt
-                    textSize = 8.5.sp.toPx()
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isAntiAlias = true
+                    // Draw percentage text inside badge
+                    val badgeTextPaint = android.graphics.Paint().apply {
+                        color = badgeNavyColorInt
+                        textSize = 8.5.sp.toPx()
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        "$pct%",
+                        badgeCenterX,
+                        badgeTop + badgeHeight * 0.74f,
+                        badgeTextPaint
+                    )
                 }
-                drawContext.canvas.nativeCanvas.drawText(
-                    "$pct%",
-                    badgeCenterX,
-                    badgeTop + badgeHeight * 0.74f,
-                    badgeTextPaint
-                )
             }
 
             // Bottom Day Label (e.g., Thu, Fri, Sat...)

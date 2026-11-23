@@ -73,6 +73,13 @@ fun ManualLogBottomSheet(
     val volumeVal = volumeInput.toDoubleOrNull() ?: 0.0
     val internalMl = VolumeConverter.toInternalMl(volumeVal, selectedUnit)
     val effectiveMl = internalMl * selectedDrinkType.defaultHydrationFactor
+    val isVolumeValid = internalMl > 0 && internalMl <= VolumeConverter.MAX_SINGLE_DRINK_ML
+    val volumeErrorText = when {
+        volumeInput.isBlank() || internalMl <= 0 -> "Enter a volume greater than 0"
+        internalMl > VolumeConverter.MAX_SINGLE_DRINK_ML ->
+            "Max single drink is ${VolumeConverter.formatVolume(VolumeConverter.MAX_SINGLE_DRINK_ML, selectedUnit)}"
+        else -> null
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -122,10 +129,12 @@ fun ManualLogBottomSheet(
             // Volume Input
             OutlinedTextField(
                 value = volumeInput,
-                onValueChange = { volumeInput = it.filter { char -> char.isDigit() || char == '.' } },
+                onValueChange = { volumeInput = VolumeConverter.sanitizeDecimalInput(it) },
                 label = { Text("Volume (${selectedUnit.symbol})") },
                 suffix = { Text(selectedUnit.symbol) },
                 singleLine = true,
+                isError = volumeErrorText != null,
+                supportingText = volumeErrorText?.let { msg -> { Text(msg) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier.fillMaxWidth()
@@ -305,7 +314,7 @@ fun ManualLogBottomSheet(
 
             Button(
                 onClick = {
-                    if (internalMl > 0) {
+                    if (isVolumeValid) {
                         onLogRecord(
                             internalMl,
                             selectedDrinkType.defaultHydrationFactor,
@@ -314,7 +323,7 @@ fun ManualLogBottomSheet(
                         )
                     }
                 },
-                enabled = internalMl > 0,
+                enabled = isVolumeValid,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(

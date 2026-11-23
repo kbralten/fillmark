@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.fillmark.app.core.DisplayUnit
@@ -25,7 +26,8 @@ data class UserPreferences(
     val wakingHoursEnd: String = "23:00",
     val wakingPacingEnabled: Boolean = true,
     val healthConnectSyncEnabled: Boolean = false,
-    val healthConnectBidirectional: Boolean = false
+    val healthConnectBidirectional: Boolean = false,
+    val lastHealthConnectSyncMillis: Long = 0L
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -40,6 +42,7 @@ class UserPreferencesRepository(private val context: Context) {
         private val KEY_HEALTH_CONNECT_SYNC_ENABLED = booleanPreferencesKey("health_connect_sync_enabled")
         private val KEY_HEALTH_CONNECT_BIDIRECTIONAL = booleanPreferencesKey("health_connect_bidirectional")
         private val KEY_HEALTH_CONNECT_CHANGES_TOKEN = stringPreferencesKey("health_connect_changes_token")
+        private val KEY_LAST_HEALTH_CONNECT_SYNC_MILLIS = longPreferencesKey("last_health_connect_sync_millis")
     }
 
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
@@ -65,7 +68,8 @@ class UserPreferencesRepository(private val context: Context) {
                 wakingHoursEnd = preferences[KEY_WAKING_HOURS_END] ?: "23:00",
                 wakingPacingEnabled = preferences[KEY_WAKING_PACING_ENABLED] ?: true,
                 healthConnectSyncEnabled = preferences[KEY_HEALTH_CONNECT_SYNC_ENABLED] ?: false,
-                healthConnectBidirectional = preferences[KEY_HEALTH_CONNECT_BIDIRECTIONAL] ?: false
+                healthConnectBidirectional = preferences[KEY_HEALTH_CONNECT_BIDIRECTIONAL] ?: false,
+                lastHealthConnectSyncMillis = preferences[KEY_LAST_HEALTH_CONNECT_SYNC_MILLIS] ?: 0L
             )
         }
 
@@ -108,6 +112,12 @@ class UserPreferencesRepository(private val context: Context) {
             } else {
                 preferences[KEY_HEALTH_CONNECT_CHANGES_TOKEN] = token
             }
+        }
+    }
+
+    suspend fun setLastHealthConnectSyncMillis(timestamp: Long) {
+        dataStore.edit { preferences ->
+            preferences[KEY_LAST_HEALTH_CONNECT_SYNC_MILLIS] = timestamp
         }
     }
 }

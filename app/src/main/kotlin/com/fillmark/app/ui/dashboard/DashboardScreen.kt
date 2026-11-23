@@ -2,6 +2,7 @@ package com.fillmark.app.ui.dashboard
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
@@ -57,13 +59,9 @@ import com.fillmark.app.ui.dashboard.components.FluidProgressMeter
 import com.fillmark.app.ui.dashboard.components.ManualLogBottomSheet
 import com.fillmark.app.ui.dashboard.components.PresetEditorDialog
 import com.fillmark.app.ui.dashboard.components.QuickPresetBar
-import com.fillmark.app.ui.dashboard.components.getPresetVector
-import com.fillmark.app.ui.theme.FillmarkCardBorder
+import com.fillmark.app.ui.history.components.EditLogDialog
 import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkCyanDark
 import com.fillmark.app.ui.theme.FillmarkNavy900
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +72,11 @@ fun DashboardScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshCurrentTime()
+        onPauseOrDispose {}
+    }
 
     // Handle 4-second undo snackbar
     LaunchedEffect(uiState.snackbarMessage) {
@@ -130,7 +133,7 @@ fun DashboardScreen(
                         text = "Fillmark",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = FillmarkNavyTitle
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Row(
@@ -139,15 +142,15 @@ fun DashboardScreen(
                         Icon(
                             imageVector = Icons.Outlined.CalendarToday,
                             contentDescription = null,
-                            tint = FillmarkSlateMuted,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = TimeUtils.formatCurrentDateHeader(),
+                            text = uiState.dateHeader,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = FillmarkSlateMuted
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -189,12 +192,12 @@ fun DashboardScreen(
                         text = "Today's Intake",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = FillmarkNavyTitle
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
                         text = "${uiState.todayRecords.size} entries",
                         style = MaterialTheme.typography.labelMedium,
-                        color = FillmarkSlateMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -216,7 +219,7 @@ fun DashboardScreen(
                             text = "No drinks logged today yet.",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Normal,
-                            color = FillmarkSlateMuted
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -225,6 +228,7 @@ fun DashboardScreen(
                     TodayLogItem(
                         record = record,
                         displayUnit = uiState.displayUnit,
+                        onClick = { viewModel.startEditingRecord(record) },
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
@@ -259,12 +263,24 @@ fun DashboardScreen(
         }
 
         if (uiState.isPresetEditorOpen) {
+            val nextOrder = (uiState.presets.maxOfOrNull { it.displayOrder } ?: -1) + 1
             PresetEditorDialog(
                 preset = uiState.editingPreset,
                 displayUnit = uiState.displayUnit,
+                nextDisplayOrder = nextOrder,
                 onDismiss = { viewModel.dismissPresetEditor() },
                 onSave = { updated -> viewModel.savePreset(updated) },
                 onDelete = { id -> viewModel.deletePreset(id) }
+            )
+        }
+
+        uiState.editingRecord?.let { recordToEdit ->
+            EditLogDialog(
+                record = recordToEdit,
+                displayUnit = uiState.displayUnit,
+                onDismiss = { viewModel.dismissEditingRecord() },
+                onSave = { updated -> viewModel.saveEditedRecord(updated) },
+                onDelete = { viewModel.deleteRecord(recordToEdit) }
             )
         }
     }
@@ -272,6 +288,8 @@ fun DashboardScreen(
 
 @Composable
 fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
+    val glassOutlineColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
+    val rippleLineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
     Canvas(modifier = modifier.size(54.dp, 72.dp)) {
         val w = size.width
         val h = size.height
@@ -320,7 +338,7 @@ fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
         }
         drawPath(
             path = ripplePath,
-            color = FillmarkCyanDark.copy(alpha = 0.85f),
+            color = rippleLineColor,
             style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
         )
 
@@ -333,7 +351,7 @@ fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
         }
         drawPath(
             path = glassPath,
-            color = FillmarkNavyTitle.copy(alpha = 0.75f),
+            color = glassOutlineColor,
             style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
         )
 
@@ -348,7 +366,7 @@ fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
         }
         drawPath(
             path = rimPath,
-            color = FillmarkNavyTitle.copy(alpha = 0.75f),
+            color = glassOutlineColor,
             style = Stroke(width = 1.5.dp.toPx())
         )
 
@@ -367,6 +385,7 @@ fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
 private fun TodayLogItem(
     record: HydrationRecordEntity,
     displayUnit: com.fillmark.app.core.DisplayUnit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -374,8 +393,10 @@ private fun TodayLogItem(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, FillmarkCardBorder),
-        modifier = modifier.fillMaxWidth()
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -392,7 +413,7 @@ private fun TodayLogItem(
                     Icon(
                         painter = androidx.compose.ui.res.painterResource(id = com.fillmark.app.core.PresetIcon.getDrawableRes(record.iconKey)),
                         contentDescription = null,
-                        tint = FillmarkCyanDark,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -403,12 +424,12 @@ private fun TodayLogItem(
                     text = record.drinkType.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = FillmarkNavyTitle
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = TimeUtils.formatTime(record.timestamp),
                     style = MaterialTheme.typography.labelSmall,
-                    color = FillmarkSlateMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -419,13 +440,13 @@ private fun TodayLogItem(
                     text = VolumeConverter.formatVolume(record.effectiveVolumeMl, displayUnit),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = FillmarkNavyTitle
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 if (record.hydrationFactor != 1.0) {
                     Text(
                         text = "Raw: ${VolumeConverter.formatVolume(record.volumeMl, displayUnit)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = FillmarkSlateMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

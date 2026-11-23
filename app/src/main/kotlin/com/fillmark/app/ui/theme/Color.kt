@@ -49,6 +49,22 @@ val PaceAheadBorder = Color(0xFFBCECD2)
 val PaceAheadText = Color(0xFF14532D)
 val PaceAheadIcon = Color(0xFF16A34A)
 
+// Pace status notification pill colors (Dark Mode)
+val PaceBehindBgDark = Color(0xFF3A1A1A)
+val PaceBehindBorderDark = Color(0xFF7F2E2A)
+val PaceBehindTextDark = Color(0xFFFFB4AB)
+val PaceBehindIconDark = Color(0xFFFF6E63)
+
+val PaceOnTrackBgDark = Color(0xFF0E2F36)
+val PaceOnTrackBorderDark = Color(0xFF1D5F6E)
+val PaceOnTrackTextDark = Color(0xFF7EEAF2)
+val PaceOnTrackIconDark = Color(0xFF20D2DE)
+
+val PaceAheadBgDark = Color(0xFF112E1F)
+val PaceAheadBorderDark = Color(0xFF1F6340)
+val PaceAheadTextDark = Color(0xFF86EFAC)
+val PaceAheadIconDark = Color(0xFF4ADE80)
+
 // Start - Partial Color List
 // Light Colors
 val primaryLight = FillmarkCyanDark

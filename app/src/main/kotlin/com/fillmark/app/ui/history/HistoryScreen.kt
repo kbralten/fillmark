@@ -40,19 +40,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
-import com.fillmark.app.ui.dashboard.components.getPresetVector
 import com.fillmark.app.ui.history.components.EditLogDialog
 
 import androidx.compose.foundation.BorderStroke
-import com.fillmark.app.ui.theme.FillmarkCardBorder
 import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkCyanDark
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,6 +58,11 @@ fun HistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshCurrentDate()
+        onPauseOrDispose {}
+    }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage
@@ -101,7 +102,7 @@ fun HistoryScreen(
                         text = "Intake History",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = FillmarkNavyTitle
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
             }
@@ -117,7 +118,7 @@ fun HistoryScreen(
                         Text(
                             text = "No drink history recorded yet.",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = FillmarkSlateMuted
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -200,7 +201,7 @@ private fun HistoryRecordItem(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, FillmarkCardBorder),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -220,7 +221,7 @@ private fun HistoryRecordItem(
                     Icon(
                         painter = androidx.compose.ui.res.painterResource(id = com.fillmark.app.core.PresetIcon.getDrawableRes(record.iconKey)),
                         contentDescription = null,
-                        tint = FillmarkCyanDark,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -231,12 +232,12 @@ private fun HistoryRecordItem(
                     text = record.drinkType.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = FillmarkNavyTitle
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = TimeUtils.formatTime(record.timestamp),
                     style = MaterialTheme.typography.labelSmall,
-                    color = FillmarkSlateMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -247,7 +248,7 @@ private fun HistoryRecordItem(
                     text = VolumeConverter.formatVolume(record.effectiveVolumeMl, displayUnit),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = FillmarkNavyTitle
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 if (record.hydrationFactor != 1.0) {
                     Text(

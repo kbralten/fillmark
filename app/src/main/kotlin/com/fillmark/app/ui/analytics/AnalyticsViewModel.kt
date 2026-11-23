@@ -65,6 +65,8 @@ class AnalyticsViewModel @JvmOverloads constructor(
     private var allTargetsMap: Map<String, Double> = emptyMap()
     private var userPreferences: UserPreferences = UserPreferences()
 
+    private var lastCalculatedDate: LocalDate = LocalDate.now()
+
     init {
         viewModelScope.launch {
             combine(
@@ -104,6 +106,13 @@ class AnalyticsViewModel @JvmOverloads constructor(
             val newOffset = currentOffset - 1
             _uiState.update { it.copy(periodOffset = newOffset) }
             calculateAnalytics(_uiState.value.selectedInterval, newOffset)
+        }
+    }
+
+    fun refreshCurrentDate() {
+        val today = LocalDate.now()
+        if (today != lastCalculatedDate) {
+            calculateAnalytics(_uiState.value.selectedInterval, _uiState.value.periodOffset)
         }
     }
 
@@ -170,6 +179,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
     private fun calculateAnalytics(interval: AnalyticsInterval, offset: Int = _uiState.value.periodOffset) {
         val zoneId = ZoneId.systemDefault()
         val today = LocalDate.now(zoneId)
+        lastCalculatedDate = today
         val periodLabel = formatPeriodLabel(interval, offset, today)
 
         when (interval) {
@@ -277,37 +287,93 @@ class AnalyticsViewModel @JvmOverloads constructor(
 
             AnalyticsInterval.THREE_MONTHS, AnalyticsInterval.YEAR -> {
                 val numWeeks = if (interval == AnalyticsInterval.THREE_MONTHS) 12 else 52
-                val endOfPeriod = today.minusDays((offset * numWeeks * 7).toLong())
-                val bars = (numWeeks - 1 downTo 0).map { weeksAgo ->
-                    val end = endOfPeriod.minusDays((weeksAgo * 7).toLong())
-                    val start = end.minusDays(6)
-                    val startMs = TimeUtils.startOfDayMillis(start, zoneId)
-                    val endMs = TimeUtils.endOfDayMillis(end, zoneId)
-                    val weekRecords = allRecords.filter { it.timestamp in startMs..endMs }
-                    val effective = weekRecords.sumOf { it.effectiveVolumeMl }
+                val summary = computeMultiWeekSummary(
+                    records = allRecords,
+                    numWeeks = numWeeks,
+                    offset = offset,
+                    today = today,
+                    zoneId = zoneId,
+                    defaultTargetMl = defaultTargetMl,
+                    allTargetsMap = allTargetsMap
+                )
 
-                    ChartBarData(
-                        label = if (weeksAgo % 4 == 0) start.format(DateTimeFormatter.ofPattern("MMM", Locale.US)) else "",
-                        valueMl = effective / 7.0,
-                        targetMl = defaultTargetMl,
-                        isCurrent = (offset == 0 && weeksAgo == 0)
-                    )
-                }
-
-                val total = bars.sumOf { it.valueMl * 7.0 }
-                val met = bars.count { it.targetMl > 0 && it.valueMl >= it.targetMl }
                 _uiState.update {
                     it.copy(
                         periodOffset = offset,
                         periodLabel = periodLabel,
-                        bars = bars,
-                        totalVolumeMl = total,
-                        averageDailyVolumeMl = bars.map { b -> b.valueMl }.average().takeIf { !it.isNaN() } ?: 0.0,
-                        daysGoalMet = met * 7,
-                        totalDays = numWeeks * 7
+                        bars = summary.bars,
+                        totalVolumeMl = summary.totalVolumeMl,
+                        averageDailyVolumeMl = summary.averageDailyVolumeMl,
+                        daysGoalMet = summary.daysGoalMet,
+                        totalDays = summary.totalDays
                     )
                 }
             }
+        }
+    }
+
+    data class MultiWeekSummary(
+        val bars: List<ChartBarData>,
+        val totalVolumeMl: Double,
+        val averageDailyVolumeMl: Double,
+        val daysGoalMet: Int,
+        val totalDays: Int
+    )
+
+    companion object {
+        fun computeMultiWeekSummary(
+            records: List<HydrationRecordEntity>,
+            numWeeks: Int,
+            offset: Int,
+            today: LocalDate,
+            zoneId: ZoneId,
+            defaultTargetMl: Double,
+            allTargetsMap: Map<String, Double>
+        ): MultiWeekSummary {
+            val endOfPeriod = today.minusDays((offset * numWeeks * 7).toLong())
+            var daysGoalMet = 0
+            var totalVolumeMl = 0.0
+
+            val bars = (numWeeks - 1 downTo 0).map { weeksAgo ->
+                val weekEnd = endOfPeriod.minusDays((weeksAgo * 7).toLong())
+                val weekStart = weekEnd.minusDays(6)
+                var weekVolume = 0.0
+                var weekTargetSum = 0.0
+
+                for (dayOffset in 0..6) {
+                    val day = weekStart.plusDays(dayOffset.toLong())
+                    val dayIso = day.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    val startMs = TimeUtils.startOfDayMillis(day, zoneId)
+                    val endMs = TimeUtils.endOfDayMillis(day, zoneId)
+                    val dayEffective = records
+                        .filter { it.timestamp in startMs..endMs }
+                        .sumOf { it.effectiveVolumeMl }
+                    val dayTarget = allTargetsMap[dayIso] ?: defaultTargetMl
+
+                    weekVolume += dayEffective
+                    weekTargetSum += dayTarget
+                    if (dayTarget > 0 && dayEffective >= dayTarget) {
+                        daysGoalMet++
+                    }
+                }
+
+                totalVolumeMl += weekVolume
+                ChartBarData(
+                    label = if (weeksAgo % 4 == 0) weekStart.format(DateTimeFormatter.ofPattern("MMM", Locale.US)) else "",
+                    valueMl = weekVolume / 7.0,
+                    targetMl = weekTargetSum / 7.0,
+                    isCurrent = (offset == 0 && weeksAgo == 0)
+                )
+            }
+
+            val totalDays = numWeeks * 7
+            return MultiWeekSummary(
+                bars = bars,
+                totalVolumeMl = totalVolumeMl,
+                averageDailyVolumeMl = if (totalDays > 0) totalVolumeMl / totalDays else 0.0,
+                daysGoalMet = daysGoalMet,
+                totalDays = totalDays
+            )
         }
     }
 }

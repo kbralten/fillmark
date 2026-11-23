@@ -20,5 +20,8 @@ interface DailyTargetDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertTarget(target: DailyTargetEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertTargetsIgnore(targets: List<DailyTargetEntity>)
 }
 

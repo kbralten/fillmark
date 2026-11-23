@@ -289,7 +289,7 @@ fun DailyLineChart(
                 isAntiAlias = true
             }
             drawContext.canvas.nativeCanvas.drawText(
-                "No drink entries recorded yet today",
+                if (data.isToday) "No drink entries recorded yet today" else "No drink entries recorded for this day",
                 (plotLeft + plotRight) / 2f,
                 (plotTop + plotBottom) / 2f,
                 emptyPaint

@@ -29,7 +29,8 @@ data class DailyLineChartData(
     val targetRatePerHour: Double = 0.0,
     val displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
     val totalIntakeMl: Double = 0.0,
-    val hasEntries: Boolean = false
+    val hasEntries: Boolean = false,
+    val isToday: Boolean = true
 )
 
 object DailyGraphCalculator {
@@ -201,7 +202,8 @@ object DailyGraphCalculator {
             targetRatePerHour = targetRatePerHour,
             displayUnit = displayUnit,
             totalIntakeMl = totalIntakeMl,
-            hasEntries = hasEntries
+            hasEntries = hasEntries,
+            isToday = (date == LocalDate.now(zoneId))
         )
     }
 }

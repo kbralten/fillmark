@@ -39,8 +39,6 @@ import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.PresetEntity
 import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -65,7 +63,7 @@ fun QuickPresetBar(
                 text = "Quick Log",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = FillmarkNavyTitle
+                color = MaterialTheme.colorScheme.onBackground
             )
             IconButton(
                 onClick = onCustomizePresets,
@@ -74,7 +72,7 @@ fun QuickPresetBar(
                 Icon(
                     imageVector = Icons.Default.Tune,
                     contentDescription = "Customize presets",
-                    tint = FillmarkSlateMuted,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(19.dp)
                 )
             }

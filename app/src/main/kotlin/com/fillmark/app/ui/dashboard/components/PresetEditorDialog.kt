@@ -84,6 +84,7 @@ fun parseHexColor(hex: String?, fallback: Color = Color(0xFF2196F3)): Color {
 fun PresetEditorDialog(
     preset: PresetEntity?, // null if adding new preset
     displayUnit: DisplayUnit,
+    nextDisplayOrder: Int = 0,
     onDismiss: () -> Unit,
     onSave: (PresetEntity) -> Unit,
     onDelete: ((String) -> Unit)? = null
@@ -109,6 +110,18 @@ fun PresetEditorDialog(
         mutableStateOf(PresetIcon.fromId(preset?.iconKey))
     }
 
+    val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
+    val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
+    val isLabelValid = labelInput.isNotBlank()
+    val isVolumeValid = ml > 0 && ml <= VolumeConverter.MAX_SINGLE_DRINK_ML
+    val volumeErrorText = when {
+        volumeInput.isBlank() || ml <= 0 -> "Enter a volume greater than 0"
+        ml > VolumeConverter.MAX_SINGLE_DRINK_ML ->
+            "Max single drink is ${VolumeConverter.formatVolume(VolumeConverter.MAX_SINGLE_DRINK_ML, selectedUnit)}"
+        else -> null
+    }
+    val canSave = isLabelValid && isVolumeValid
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -130,6 +143,10 @@ fun PresetEditorDialog(
                     onValueChange = { labelInput = it },
                     label = { Text("Preset Name") },
                     singleLine = true,
+                    isError = !isLabelValid,
+                    supportingText = if (!isLabelValid) {
+                        { Text("Enter a preset name") }
+                    } else null,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -163,10 +180,12 @@ fun PresetEditorDialog(
                 // Volume input in active unit
                 OutlinedTextField(
                     value = volumeInput,
-                    onValueChange = { volumeInput = it.filter { c -> c.isDigit() || c == '.' } },
+                    onValueChange = { volumeInput = VolumeConverter.sanitizeDecimalInput(it) },
                     label = { Text("Standard Volume (${selectedUnit.symbol})") },
                     suffix = { Text(selectedUnit.symbol) },
                     singleLine = true,
+                    isError = volumeErrorText != null,
+                    supportingText = volumeErrorText?.let { msg -> { Text(msg) } },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -330,9 +349,7 @@ fun PresetEditorDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
-                    val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
-                    if (labelInput.isNotBlank() && ml > 0) {
+                    if (canSave) {
                         val updated = preset?.copy(
                             label = labelInput.trim(),
                             volumeMl = ml,
@@ -346,13 +363,14 @@ fun PresetEditorDialog(
                             volumeMl = ml,
                             iconKey = selectedIcon.id,
                             hydrationFactor = selectedDrinkType.defaultHydrationFactor,
-                            displayOrder = 99,
+                            displayOrder = nextDisplayOrder,
                             drinkType = selectedDrinkType.id,
                             colorHex = selectedColorHex
                         )
                         onSave(updated)
                     }
-                }
+                },
+                enabled = canSave
             ) {
                 Text("Save")
             }

@@ -16,11 +16,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -43,15 +45,14 @@ import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.ui.common.DateTimePickerDialog
 import com.fillmark.app.ui.common.UnitToggle
-import com.fillmark.app.ui.theme.FillmarkCardBorder
-import com.fillmark.app.ui.theme.FillmarkCyanDark
 
 @Composable
 fun EditLogDialog(
     record: HydrationRecordEntity,
     displayUnit: DisplayUnit,
     onDismiss: () -> Unit,
-    onSave: (HydrationRecordEntity) -> Unit
+    onSave: (HydrationRecordEntity) -> Unit,
+    onDelete: (() -> Unit)? = null
 ) {
     var selectedUnit by remember { mutableStateOf(displayUnit) }
     var volumeInput by remember {
@@ -60,6 +61,16 @@ fun EditLogDialog(
     var selectedDrinkType by remember { mutableStateOf(DrinkType.fromId(record.drinkType)) }
     var selectedTimestamp by remember { mutableStateOf(record.timestamp) }
     var showDateTimePicker by remember { mutableStateOf(false) }
+
+    val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
+    val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
+    val isVolumeValid = ml > 0 && ml <= VolumeConverter.MAX_SINGLE_DRINK_ML
+    val volumeErrorText = when {
+        volumeInput.isBlank() || ml <= 0 -> "Enter a volume greater than 0"
+        ml > VolumeConverter.MAX_SINGLE_DRINK_ML ->
+            "Max single drink is ${VolumeConverter.formatVolume(VolumeConverter.MAX_SINGLE_DRINK_ML, selectedUnit)}"
+        else -> null
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -98,10 +109,12 @@ fun EditLogDialog(
 
                 OutlinedTextField(
                     value = volumeInput,
-                    onValueChange = { volumeInput = it.filter { char -> char.isDigit() || char == '.' } },
+                    onValueChange = { volumeInput = VolumeConverter.sanitizeDecimalInput(it) },
                     label = { Text("Volume (${selectedUnit.symbol})") },
                     suffix = { Text(selectedUnit.symbol) },
                     singleLine = true,
+                    isError = volumeErrorText != null,
+                    supportingText = volumeErrorText?.let { msg -> { Text(msg) } },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -144,7 +157,7 @@ fun EditLogDialog(
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(1.dp, FillmarkCardBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showDateTimePicker = true }
@@ -158,7 +171,7 @@ fun EditLogDialog(
                             Icon(
                                 imageVector = Icons.Outlined.CalendarToday,
                                 contentDescription = null,
-                                tint = FillmarkCyanDark,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -183,9 +196,7 @@ fun EditLogDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
-                    val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
-                    if (ml > 0) {
+                    if (isVolumeValid) {
                         onSave(
                             record.copy(
                                 volumeMl = ml,
@@ -195,14 +206,26 @@ fun EditLogDialog(
                             )
                         )
                     }
-                }
+                },
+                enabled = isVolumeValid
             ) {
                 Text("Save")
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete entry",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+                OutlinedButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
             }
         }
     )

@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,21 +45,30 @@ import com.fillmark.app.domain.PacingResult
 import com.fillmark.app.domain.PacingStatus
 import com.fillmark.app.ui.theme.FillmarkCyan
 import com.fillmark.app.ui.theme.FillmarkIndigo
-import com.fillmark.app.ui.theme.FillmarkNavy900
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 import com.fillmark.app.ui.theme.PaceAheadBg
+import com.fillmark.app.ui.theme.PaceAheadBgDark
 import com.fillmark.app.ui.theme.PaceAheadBorder
+import com.fillmark.app.ui.theme.PaceAheadBorderDark
 import com.fillmark.app.ui.theme.PaceAheadIcon
+import com.fillmark.app.ui.theme.PaceAheadIconDark
 import com.fillmark.app.ui.theme.PaceAheadText
+import com.fillmark.app.ui.theme.PaceAheadTextDark
 import com.fillmark.app.ui.theme.PaceBehindBg
+import com.fillmark.app.ui.theme.PaceBehindBgDark
 import com.fillmark.app.ui.theme.PaceBehindBorder
+import com.fillmark.app.ui.theme.PaceBehindBorderDark
 import com.fillmark.app.ui.theme.PaceBehindIcon
+import com.fillmark.app.ui.theme.PaceBehindIconDark
 import com.fillmark.app.ui.theme.PaceBehindText
+import com.fillmark.app.ui.theme.PaceBehindTextDark
 import com.fillmark.app.ui.theme.PaceOnTrackBg
+import com.fillmark.app.ui.theme.PaceOnTrackBgDark
 import com.fillmark.app.ui.theme.PaceOnTrackBorder
+import com.fillmark.app.ui.theme.PaceOnTrackBorderDark
 import com.fillmark.app.ui.theme.PaceOnTrackIcon
+import com.fillmark.app.ui.theme.PaceOnTrackIconDark
 import com.fillmark.app.ui.theme.PaceOnTrackText
+import com.fillmark.app.ui.theme.PaceOnTrackTextDark
 import kotlin.math.roundToInt
 
 @Composable
@@ -83,6 +93,12 @@ fun FluidProgressMeter(
         animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
         label = "PacingAnimation"
     )
+
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val trackColor = if (isDark) Color(0xFF1A2F44) else Color(0xFFE2EAF1)
+    val pacingTrackColor = if (isDark) Color(0xFF2B587E) else FillmarkIndigo
+    val primaryTextColor = MaterialTheme.colorScheme.onBackground
+    val mutedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = modifier,
@@ -166,7 +182,7 @@ fun FluidProgressMeter(
 
                 // Outer circular track (subtle background ring)
                 drawArc(
-                    color = Color(0xFFE2EAF1),
+                    color = trackColor,
                     startAngle = 0f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -180,7 +196,7 @@ fun FluidProgressMeter(
                     if (animatedPacing > 0.01f) {
                         val pacingSweep = (animatedPacing * 360f).coerceIn(4f, 360f)
                         drawArc(
-                            color = FillmarkIndigo,
+                            color = pacingTrackColor,
                             startAngle = -90f,
                             sweepAngle = pacingSweep,
                             useCenter = false,
@@ -231,33 +247,33 @@ fun FluidProgressMeter(
                         text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
                         style = MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = FillmarkNavyTitle
+                        color = primaryTextColor
                     )
                     Text(
                         text = displayUnit.symbol,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = FillmarkNavyTitle.copy(alpha = 0.85f)
+                        color = primaryTextColor.copy(alpha = 0.85f)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "$percent% of ${VolumeConverter.formatVolume(targetMl, displayUnit)}",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Normal,
-                        color = FillmarkSlateMuted
+                        color = mutedTextColor
                     )
                 } else {
                     Text(
                         text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
                         style = MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = FillmarkNavyTitle
+                        color = primaryTextColor
                     )
                     Text(
                         text = displayUnit.symbol,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = FillmarkNavyTitle
+                        color = primaryTextColor
                     )
                 }
             }
@@ -268,24 +284,24 @@ fun FluidProgressMeter(
             Spacer(modifier = Modifier.height(14.dp))
             val (bgColor, borderColor, textColor, iconColor, iconVector) = when (pacingResult.status) {
                 PacingStatus.BEHIND -> PaceStatusStyle(
-                    bg = PaceBehindBg,
-                    border = PaceBehindBorder,
-                    text = PaceBehindText,
-                    iconTint = PaceBehindIcon,
+                    bg = if (isDark) PaceBehindBgDark else PaceBehindBg,
+                    border = if (isDark) PaceBehindBorderDark else PaceBehindBorder,
+                    text = if (isDark) PaceBehindTextDark else PaceBehindText,
+                    iconTint = if (isDark) PaceBehindIconDark else PaceBehindIcon,
                     icon = Icons.Filled.Error
                 )
                 PacingStatus.ON_TRACK -> PaceStatusStyle(
-                    bg = PaceOnTrackBg,
-                    border = PaceOnTrackBorder,
-                    text = PaceOnTrackText,
-                    iconTint = PaceOnTrackIcon,
+                    bg = if (isDark) PaceOnTrackBgDark else PaceOnTrackBg,
+                    border = if (isDark) PaceOnTrackBorderDark else PaceOnTrackBorder,
+                    text = if (isDark) PaceOnTrackTextDark else PaceOnTrackText,
+                    iconTint = if (isDark) PaceOnTrackIconDark else PaceOnTrackIcon,
                     icon = Icons.Filled.CheckCircle
                 )
                 PacingStatus.AHEAD -> PaceStatusStyle(
-                    bg = PaceAheadBg,
-                    border = PaceAheadBorder,
-                    text = PaceAheadText,
-                    iconTint = PaceAheadIcon,
+                    bg = if (isDark) PaceAheadBgDark else PaceAheadBg,
+                    border = if (isDark) PaceAheadBorderDark else PaceAheadBorder,
+                    text = if (isDark) PaceAheadTextDark else PaceAheadText,
+                    iconTint = if (isDark) PaceAheadIconDark else PaceAheadIcon,
                     icon = Icons.Filled.CheckCircle
                 )
             }

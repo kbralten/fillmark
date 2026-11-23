@@ -43,10 +43,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fillmark.app.core.TimeUtils
-import com.fillmark.app.ui.theme.FillmarkCardBorder
-import com.fillmark.app.ui.theme.FillmarkCyanDark
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -83,7 +79,7 @@ fun DateTimePickerDialog(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = FillmarkNavyTitle
+                color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
@@ -128,7 +124,7 @@ fun DateTimePickerDialog(
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
-                    border = BorderStroke(1.dp, FillmarkCardBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { isDatePickerOpen = true }
@@ -144,7 +140,7 @@ fun DateTimePickerDialog(
                             Icon(
                                 imageVector = Icons.Outlined.CalendarToday,
                                 contentDescription = null,
-                                tint = FillmarkCyanDark,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
@@ -152,14 +148,14 @@ fun DateTimePickerDialog(
                                 Text(
                                     text = "Date",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = FillmarkSlateMuted
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = TimeUtils.formatFriendlyDate(selectedDate.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)) +
                                             " (${TimeUtils.formatFullDate(selectedDate)})",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = FillmarkNavyTitle
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -176,7 +172,7 @@ fun DateTimePickerDialog(
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
-                    border = BorderStroke(1.dp, FillmarkCardBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { isTimePickerOpen = true }
@@ -192,7 +188,7 @@ fun DateTimePickerDialog(
                             Icon(
                                 imageVector = Icons.Outlined.Schedule,
                                 contentDescription = null,
-                                tint = FillmarkCyanDark,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
@@ -200,13 +196,13 @@ fun DateTimePickerDialog(
                                 Text(
                                     text = "Time",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = FillmarkSlateMuted
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = TimeUtils.formatTime(selectedTime),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = FillmarkNavyTitle
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }

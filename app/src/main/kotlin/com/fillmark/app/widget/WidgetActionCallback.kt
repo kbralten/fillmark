@@ -10,10 +10,8 @@ import com.fillmark.app.data.local.FillmarkDatabase
 import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.sync.HealthConnectManager
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -55,14 +53,9 @@ class QuickLogActionCallback : ActionCallback {
             ).show()
         }
 
-        // Trigger Health Connect sync asynchronously if enabled
+        // Trigger Health Connect sync reliably via WorkManager if enabled
         if (prefs.healthConnectSyncEnabled) {
-            CoroutineScope(Dispatchers.IO).launch {
-                val hc = HealthConnectManager(context)
-                if (hc.isAvailable() && hc.hasAllPermissions()) {
-                    hc.syncOutbound(database)
-                }
-            }
+            HealthConnectManager.enqueueImmediateSync(context, replace = true)
         }
 
         // Reschedule midnight alarm to be sure

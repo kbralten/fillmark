@@ -9,9 +9,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import com.fillmark.app.data.local.UserPreferencesRepository
+import com.fillmark.app.sync.HealthConnectManager
 import com.fillmark.app.ui.theme.FillmarkTheme
 import com.fillmark.app.widget.MidnightAlarmScheduler
 import com.fillmark.app.widget.WidgetUpdateHelper
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -29,6 +32,11 @@ class MainActivity : ComponentActivity() {
     MidnightAlarmScheduler.scheduleMidnightReset(this)
     lifecycleScope.launch {
       WidgetUpdateHelper.updateAllWidgets(this@MainActivity)
+      val prefs = UserPreferencesRepository(this@MainActivity).preferencesFlow.first()
+      if (prefs.healthConnectSyncEnabled) {
+        HealthConnectManager.schedulePeriodicSync(this@MainActivity)
+        HealthConnectManager.enqueueImmediateSync(this@MainActivity)
+      }
     }
   }
 }

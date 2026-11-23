@@ -76,5 +76,14 @@ class VolumeConverterTest {
         assertEquals("abc", VolumeConverter.convertInputVolume("abc", DisplayUnit.METRIC_ML, DisplayUnit.IMPERIAL_FL_OZ))
         assertEquals("250", VolumeConverter.convertInputVolume("250", DisplayUnit.METRIC_ML, DisplayUnit.METRIC_ML))
     }
+
+    @Test
+    fun testSanitizeDecimalInput() {
+        assertEquals("12.34", VolumeConverter.sanitizeDecimalInput("12.3.4"))
+        assertEquals("123.5", VolumeConverter.sanitizeDecimalInput("12a3.5b"))
+        assertEquals(".5", VolumeConverter.sanitizeDecimalInput("..5"))
+        assertEquals("250", VolumeConverter.sanitizeDecimalInput("250"))
+        assertEquals("", VolumeConverter.sanitizeDecimalInput("abc"))
+    }
 }
 

@@ -21,7 +21,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -40,16 +40,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkNavy900
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
-import com.fillmark.app.ui.theme.FillmarkCardBorder
-import com.fillmark.app.ui.theme.FillmarkCyanContainer
-import com.fillmark.app.ui.theme.FillmarkCyanDark
 
 enum class NavigationTab(val label: String) {
     DASHBOARD("Today"),
@@ -60,7 +53,7 @@ enum class NavigationTab(val label: String) {
 
 @Composable
 fun MainNavigation() {
-    var currentTab by remember { mutableStateOf(NavigationTab.DASHBOARD) }
+    var currentTab by rememberSaveable { mutableStateOf(NavigationTab.DASHBOARD) }
 
     BackHandler(enabled = currentTab != NavigationTab.DASHBOARD) {
         currentTab = NavigationTab.DASHBOARD
@@ -74,7 +67,7 @@ fun MainNavigation() {
             NavigationBar(
                 modifier = Modifier
                     .border(
-                        BorderStroke(1.dp, FillmarkCardBorder),
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                     )
                     .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
@@ -101,11 +94,11 @@ fun MainNavigation() {
                         selected = isSelected,
                         onClick = { currentTab = tab },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = FillmarkCyanDark,
-                            selectedTextColor = FillmarkCyanDark,
-                            indicatorColor = FillmarkCyanContainer,
-                            unselectedIconColor = FillmarkSlateMuted,
-                            unselectedTextColor = FillmarkSlateMuted
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }

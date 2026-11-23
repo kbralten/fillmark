@@ -1,5 +1,7 @@
 package com.fillmark.app.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -23,6 +26,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -35,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,15 +50,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.sync.HealthConnectManager
-
-import com.fillmark.app.ui.theme.FillmarkCardBorder
-import com.fillmark.app.ui.theme.FillmarkNavyTitle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +69,11 @@ fun SettingsScreen(
     val context = LocalContext.current
     val hcManager = remember { HealthConnectManager(context) }
 
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshHealthConnectStatus()
+        onPauseOrDispose {}
+    }
+
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) { grantedPermissions ->
@@ -74,14 +83,37 @@ fun SettingsScreen(
         }
     }
 
-    var targetInput by remember(uiState.defaultTargetMl, uiState.displayUnit) {
+    val hasTarget = uiState.defaultTargetMl > 0
+    var targetInput by remember {
         mutableStateOf(
             if (uiState.defaultTargetMl > 0) {
-                VolumeConverter.formatNumberOnly(uiState.defaultTargetMl, uiState.displayUnit)
+                VolumeConverter.formatInputNumber(uiState.defaultTargetMl, uiState.displayUnit)
             } else {
                 if (uiState.displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
             }
         )
+    }
+    var lastObservedUnit by remember { mutableStateOf(uiState.displayUnit) }
+    var lastObservedHasTarget by remember { mutableStateOf(hasTarget) }
+
+    LaunchedEffect(uiState.displayUnit, hasTarget, uiState.defaultTargetMl) {
+        if (lastObservedUnit != uiState.displayUnit || lastObservedHasTarget != hasTarget) {
+            if (hasTarget) {
+                targetInput = VolumeConverter.formatInputNumber(uiState.defaultTargetMl, uiState.displayUnit)
+            }
+            lastObservedUnit = uiState.displayUnit
+            lastObservedHasTarget = hasTarget
+        }
+    }
+
+    val parsedTarget = targetInput.toDoubleOrNull() ?: 0.0
+    val targetInternalMl = VolumeConverter.toInternalMl(parsedTarget, uiState.displayUnit)
+    val targetErrorText = when {
+        !hasTarget -> null
+        targetInput.isBlank() || targetInternalMl <= 0 -> "Enter a target greater than 0"
+        targetInternalMl > VolumeConverter.MAX_DAILY_TARGET_ML ->
+            "Max daily target is ${VolumeConverter.formatVolume(VolumeConverter.MAX_DAILY_TARGET_ML, uiState.displayUnit)}"
+        else -> null
     }
 
     var showWakeTimePicker by remember { mutableStateOf(false) }
@@ -98,21 +130,22 @@ fun SettingsScreen(
             text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
-            color = FillmarkNavyTitle
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         // Card 1: Units
         Card(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, FillmarkCardBorder),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "Display Units",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -131,10 +164,10 @@ fun SettingsScreen(
         }
 
         // Card 2: Daily Target Goal
-        val hasTarget = uiState.defaultTargetMl > 0
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -147,7 +180,8 @@ fun SettingsScreen(
                         Text(
                             text = "Daily Target Goal",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = if (hasTarget) "Track intake towards a daily goal" else "No goal set (displays intake in big numbers)",
@@ -159,11 +193,13 @@ fun SettingsScreen(
                         checked = hasTarget,
                         onCheckedChange = { isChecked ->
                             if (isChecked) {
-                                val defaultVal = if (uiState.displayUnit == DisplayUnit.METRIC_ML) 2500.0 else 85.0
-                                viewModel.setDefaultTarget(defaultVal)
-                                targetInput = VolumeConverter.formatNumberOnly(defaultVal, uiState.displayUnit)
+                                val defaultValInUnit = if (uiState.displayUnit == DisplayUnit.METRIC_ML) 2500.0 else 85.0
+                                targetInput = if (uiState.displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
+                                lastObservedHasTarget = true
+                                viewModel.setDefaultTarget(defaultValInUnit)
                             } else {
-                                viewModel.setDefaultTarget(0.0)
+                                lastObservedHasTarget = false
+                                viewModel.setDefaultTargetMl(0.0)
                             }
                         }
                     )
@@ -173,15 +209,22 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(14.dp))
                     OutlinedTextField(
                         value = targetInput,
-                        onValueChange = {
-                            targetInput = it.filter { c -> c.isDigit() || c == '.' }
-                            val num = targetInput.toDoubleOrNull()
-                            if (num != null && num > 0) {
-                                viewModel.setDefaultTarget(num)
+                        onValueChange = { raw ->
+                            val sanitized = VolumeConverter.sanitizeDecimalInput(raw)
+                            targetInput = sanitized
+                            val num = sanitized.toDoubleOrNull()
+                            if (num != null) {
+                                val ml = VolumeConverter.toInternalMl(num, uiState.displayUnit)
+                                if (ml > 0 && ml <= VolumeConverter.MAX_DAILY_TARGET_ML) {
+                                    viewModel.setDefaultTargetMl(ml)
+                                }
                             }
                         },
                         label = { Text("Daily Target") },
                         suffix = { Text(uiState.displayUnit.symbol) },
+                        singleLine = true,
+                        isError = targetErrorText != null,
+                        supportingText = targetErrorText?.let { msg -> { Text(msg) } },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -191,8 +234,9 @@ fun SettingsScreen(
 
         // Card 3: Waking Hours Schedule & Pacing
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -205,7 +249,8 @@ fun SettingsScreen(
                         Text(
                             text = "Waking Hours Pacing",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "Calculate expected progress based on waking schedule",
@@ -246,32 +291,65 @@ fun SettingsScreen(
 
         // Card 4: Health Connect
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "Health Connect Integration",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = if (uiState.isHealthConnectAvailable) {
-                        if (uiState.hasHealthConnectPermissions) {
+                    text = when {
+                        uiState.isHealthConnectAvailable && uiState.hasHealthConnectPermissions ->
                             "Status: Connected and ready to sync."
-                        } else {
+                        uiState.isHealthConnectAvailable ->
                             "Status: Health Connect available. Permissions required."
-                        }
-                    } else {
-                        "Status: Health Connect is not available on this device."
+                        uiState.healthConnectSdkStatus == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
+                            "Status: Health Connect needs to be installed or updated."
+                        else ->
+                            "Status: Health Connect is not available on this device."
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (uiState.hasHealthConnectPermissions) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (uiState.hasHealthConnectPermissions) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
 
-                if (uiState.isHealthConnectAvailable && !uiState.hasHealthConnectPermissions) {
+                if (uiState.healthConnectSdkStatus == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            val marketIntent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("market://details?id=com.google.android.apps.healthdata")
+                            ).apply {
+                                setPackage("com.android.vending")
+                            }
+                            runCatching { context.startActivity(marketIntent) }
+                                .onFailure {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata")
+                                            )
+                                        )
+                                    }
+                                }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Install / Update Health Connect")
+                    }
+                } else if (uiState.isHealthConnectAvailable && !uiState.hasHealthConnectPermissions) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = {
@@ -290,7 +368,11 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Enable Outbound Sync", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Enable Outbound Sync",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Switch(
                             checked = uiState.healthConnectSyncEnabled,
                             onCheckedChange = { enabled ->
@@ -307,7 +389,11 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Bidirectional Inbound Sync", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "Bidirectional Inbound Sync",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                             Text(
                                 "Import drinks logged in other fitness apps into Fillmark",
                                 style = MaterialTheme.typography.bodySmall,
@@ -322,6 +408,37 @@ fun SettingsScreen(
                             }
                         )
                     }
+
+                    if (uiState.healthConnectSyncEnabled) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        val lastSyncText = if (uiState.lastHealthConnectSyncMillis > 0L) {
+                            "Last synced: ${TimeUtils.formatDateTime(uiState.lastHealthConnectSyncMillis)}"
+                        } else {
+                            "Last synced: Never"
+                        }
+                        Text(
+                            text = lastSyncText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.syncHealthConnectNow() },
+                            enabled = !uiState.isSyncingHealthConnect,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (uiState.isSyncingHealthConnect) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Syncing...")
+                            } else {
+                                Text("Sync Now")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -330,15 +447,17 @@ fun SettingsScreen(
         val appWidgetManager = remember { android.appwidget.AppWidgetManager.getInstance(context) }
         if (appWidgetManager.isRequestPinAppWidgetSupported) {
             Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Home Screen Widgets",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -352,9 +471,12 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        androidx.compose.material3.OutlinedButton(
+                        OutlinedButton(
                             onClick = {
-                                val provider = android.content.ComponentName(context, com.fillmark.app.widget.FullDashboardWidgetReceiver::class.java)
+                                val provider = android.content.ComponentName(
+                                    context,
+                                    com.fillmark.app.widget.FullDashboardWidgetReceiver::class.java
+                                )
                                 appWidgetManager.requestPinAppWidget(provider, null, null)
                             },
                             modifier = Modifier.weight(1f)
@@ -362,9 +484,12 @@ fun SettingsScreen(
                             Text("Full Widget", style = MaterialTheme.typography.labelMedium)
                         }
 
-                        androidx.compose.material3.OutlinedButton(
+                        OutlinedButton(
                             onClick = {
-                                val provider = android.content.ComponentName(context, com.fillmark.app.widget.ProgressMeterWidgetReceiver::class.java)
+                                val provider = android.content.ComponentName(
+                                    context,
+                                    com.fillmark.app.widget.ProgressMeterWidgetReceiver::class.java
+                                )
                                 appWidgetManager.requestPinAppWidget(provider, null, null)
                             },
                             modifier = Modifier.weight(1f)
@@ -372,9 +497,12 @@ fun SettingsScreen(
                             Text("Progress (3x1)", style = MaterialTheme.typography.labelMedium)
                         }
 
-                        androidx.compose.material3.OutlinedButton(
+                        OutlinedButton(
                             onClick = {
-                                val provider = android.content.ComponentName(context, com.fillmark.app.widget.QuickLogBarWidgetReceiver::class.java)
+                                val provider = android.content.ComponentName(
+                                    context,
+                                    com.fillmark.app.widget.QuickLogBarWidgetReceiver::class.java
+                                )
                                 appWidgetManager.requestPinAppWidget(provider, null, null)
                             },
                             modifier = Modifier.weight(1f)
@@ -505,4 +633,3 @@ fun TimePickerModalDialog(
         }
     )
 }
-
