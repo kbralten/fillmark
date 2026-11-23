@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fillmark — Privacy Policy</title>
+  <link rel="icon" type="image/png" href="icon-512.png">
+  <style>
+    :root {
+      --bg: #f6f9fb;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0d1e32;
+      --muted: #556677;
+      --accent: #007a87;
+      --accent-soft: #e6f7f9;
+      --accent-border: #b4eaf0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #091420;
+        --surface: #0f1e2e;
+        --border: #1b3145;
+        --text: #f1f5f9;
+        --muted: #94a3b8;
+        --accent: #20d2de;
+        --accent-soft: #0f2c38;
+        --accent-border: #184b5c;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      line-height: 1.65;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px 16px 64px;
+    }
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 32px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    header img {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      flex-shrink: 0;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      line-height: 1.2;
+    }
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .callout {
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin: 20px 0 28px;
+      font-size: 0.96rem;
+    }
+    h2 {
+      font-size: 1.18rem;
+      margin: 28px 0 10px;
+      color: var(--accent);
+    }
+    p, li {
+      color: var(--text);
+      font-size: 0.98rem;
+    }
+    ul {
+      padding-left: 20px;
+      margin: 8px 0 16px;
+    }
+    li { margin-bottom: 6px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.9em;
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    footer {
+      max-width: 760px;
+      margin: 20px auto 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    @media (max-width: 600px) {
+      main { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icon-512.png" alt="Fillmark app icon">
+      <div>
+        <h1>Fillmark Privacy Policy</h1>
+        <p class="subtitle">Package: <code>ca.bralten.fillmark</code> &middot; Effective Date: November 23, 2026</p>
+      </div>
+    </header>
+
+    <div class="callout">
+      <strong>Summary:</strong> Fillmark is a local-first drink and hydration tracker. We operate no developer or third-party cloud servers, require no account, and collect no analytics, advertising identifiers, or telemetry. Nothing ever leaves your device or your own personal Google Account.
+    </div>
+
+    <h2>1. Information Stored by Fillmark</h2>
+    <p>Fillmark stores only the information you actively enter or configure inside the app:</p>
+    <ul>
+      <li>Drink log entries (volume, beverage category, hydration factor, icon selection, and timestamps).</li>
+      <li>Custom drink presets (labels, volumes, icons, and colors).</li>
+      <li>Daily hydration targets, waking-hours schedule, unit preference (metric or imperial), and Health Connect sync preferences.</li>
+    </ul>
+
+    <h2>2. No Third-Party Servers, Accounts, or Telemetry</h2>
+    <ul>
+      <li><strong>No developer backend:</strong> Fillmark does not transmit your hydration records or settings to any developer-operated server or third-party cloud service.</li>
+      <li><strong>No tracking or ads:</strong> Fillmark contains zero advertising SDKs, analytics trackers, or crash-reporting telemetry services.</li>
+      <li><strong>No user accounts:</strong> You never sign in to Fillmark or provide your name, email address, or profile information to us.</li>
+    </ul>
+
+    <h2>3. Local Storage &amp; Android Auto Backup</h2>
+    <p>All app data is stored locally on your Android device using an on-device Room (SQLite) database and Jetpack DataStore preferences.</p>
+    <p>To help you keep your history when switching or resetting phones, Fillmark supports Android's built-in <strong>Cloud Auto Backup</strong> and <strong>Device-to-Device Transfer</strong>. When Cloud Auto Backup is enabled in your Android system settings, Android backs up Fillmark's local database and preferences directly to <strong>your own personal Google Account</strong> under Google's backup encryption. No data is shared with Fillmark or any third-party service, and nothing leaves your Google Account. You can disable Android Auto Backup at any time in your device's <em>Settings &gt; Google &gt; Backup</em>.</p>
+
+    <h2>4. Optional Android Health Connect Integration</h2>
+    <p>If you explicitly choose to enable Health Connect integration in Fillmark's Settings and grant system permissions, Fillmark requests access to the following Health Connect data types:</p>
+    <ul>
+      <li><code>android.permission.health.WRITE_HYDRATION</code> (<code>HydrationRecord</code>): To write drinks you log, edit, or delete in Fillmark to Health Connect on your device.</li>
+      <li><code>android.permission.health.READ_HYDRATION</code> (<code>HydrationRecord</code>): Used when bidirectional inbound sync is enabled to import hydration records logged by other health apps into Fillmark without creating duplicates.</li>
+    </ul>
+    <p><strong>Health Connect Limited Use &amp; Privacy Commitment:</strong></p>
+    <ul>
+      <li>Health Connect data is processed strictly on-device and solely to display and synchronize your hydration logs within Fillmark.</li>
+      <li>Fillmark never sells, shares, or transfers Health Connect data to third parties, data brokers, advertisers, or remote servers, and never uses it for advertising, credit, insurance, or employment decisions.</li>
+      <li>You may pause sync inside Fillmark Settings or revoke Health Connect permissions at any time through Android's Health Connect settings.</li>
+    </ul>
+
+    <h2>5. Data Control &amp; Deletion</h2>
+    <p>Because your data resides on your device (and optionally in your own Google Account backup), you remain in full control:</p>
+    <ul>
+      <li>Delete individual drink entries or presets at any time inside the app.</li>
+      <li>Permanently erase all local app data via Android <em>Settings &gt; Apps &gt; Fillmark &gt; Storage &gt; Clear storage</em>, or by uninstalling the app.</li>
+      <li>Manage or remove backed-up data from your Google Drive backups in your Google Account settings.</li>
+    </ul>
+
+    <h2>6. Wellness Disclaimer</h2>
+    <p>Fillmark is designed for general personal wellness and hydration tracking only. It is not a medical device and does not provide medical advice, diagnosis, or treatment.</p>
+
+    <h2>7. Children's Privacy</h2>
+    <p>Fillmark does not knowingly collect personal information from anyone, including children under 13 (or the applicable age of digital consent in your jurisdiction), as no personal data is transmitted to us.</p>
+
+    <h2>8. Open Source &amp; Contact</h2>
+    <p>Fillmark is free, open-source software licensed under the GNU General Public License v3.0 (GPL-3.0). For bug reports or feature requests, please open an issue on <a href="https://github.com/kbralten/fillmark/issues">GitHub Issues</a>. If you have questions about this privacy policy or Fillmark's data practices, please contact us at <a href="mailto:fillmark@bralten.ca">fillmark@bralten.ca</a>.</p>
+  </main>
+
+  <footer>
+    <p><a href="index.html">Fillmark Home</a> &middot; &copy; 2026 Fillmark</p>
+  </footer>
+</body>
+</html>

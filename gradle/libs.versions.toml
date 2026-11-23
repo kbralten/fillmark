@@ -17,7 +17,7 @@ ksp = "2.3.10"
 room = "2.8.5"
 datastore = "1.1.3"
 glance = "1.1.1"
-healthConnect = "1.1.0-alpha11"
+healthConnect = "1.1.0"
 work = "2.10.0"
 
 [libraries]

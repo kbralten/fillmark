@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <group
+        android:name="bottle_tilted_monochrome"
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-20">
+
+        <!-- Bottle Cap -->
+        <path
+            android:pathData="M46,14 L62,14 A3,3 0 0,1 65,17 L65,22 L43,22 L43,17 A3,3 0 0,1 46,14 Z"
+            android:fillColor="#FFFFFF" />
+        <path
+            android:pathData="M49,11 L59,11 A2,2 0 0,1 61,13 L61,14 L47,14 L47,13 A2,2 0 0,1 49,11 Z"
+            android:fillColor="#FFFFFF" />
+
+        <!-- Cap strap / loop -->
+        <path
+            android:pathData="M65,18 C71,18 73,26 67,28"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.2"
+            android:strokeLineCap="round" />
+
+        <!-- Bottle Neck Ring -->
+        <path
+            android:pathData="M44,24 L64,24"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.0" />
+
+        <!-- Water liquid fill with cutout measurement ticks -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M40,52 C45,50 50,54 54,52 C58,50 63,53 68,51 L68,81 A7,7 0 0,1 61,88 L47,88 A7,7 0 0,1 40,81 Z M44,57 L48,57 L48,59 L44,59 Z M44,63 L50,63 L50,65 L44,65 Z M44,69 L48,69 L48,71 L44,71 Z M44,75 L50,75 L50,77 L44,77 Z" />
+
+        <!-- Upper measurement fillmarks above water line -->
+        <path
+            android:pathData="M44,40 L49,40 M44,46 L47,46"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="1.8"
+            android:strokeLineCap="round" />
+
+        <!-- Bottle Outer Outline -->
+        <path
+            android:pathData="M44,26 L64,26 L68,34 L68,81 A7,7 0 0,1 61,88 L47,88 A7,7 0 0,1 40,81 L40,34 Z"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.6"
+            android:strokeLineJoin="round" />
+
+        <!-- Water droplets -->
+        <path
+            android:pathData="M37,20 C37,18 40,15 40,15 C40,15 43,18 43,20 A3,3 0 0,1 37,20 Z"
+            android:fillColor="#FFFFFF" />
+        <path
+            android:pathData="M33,30 C33,28 35,26 35,26 C35,26 37,28 37,30 A2,2 0 0,1 33,30 Z"
+            android:fillColor="#FFFFFF" />
+    </group>
+
+</vector>

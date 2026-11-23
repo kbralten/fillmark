@@ -15,22 +15,40 @@ class WidgetMidnightReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
-        val action = intent?.action
-        Log.d(TAG, "Received broadcast action: $action")
+        handleWidgetRefreshBroadcast(context, intent, TAG)
+    }
+}
 
-        // Reschedule alarm for next midnight
-        MidnightAlarmScheduler.scheduleMidnightReset(context)
+class WidgetSystemEventReceiver : BroadcastReceiver() {
+    companion object {
+        private const val TAG = "WidgetSystemEventReceiver"
+    }
 
-        // Asynchronously update all widgets
-        val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.Default).launch {
-            try {
-                WidgetUpdateHelper.updateAllWidgets(context)
-            } catch (e: Exception) {
-                Log.w(TAG, "Error updating widgets on broadcast", e)
-            } finally {
-                pendingResult.finish()
-            }
+    override fun onReceive(context: Context, intent: Intent?) {
+        handleWidgetRefreshBroadcast(context, intent, TAG)
+    }
+}
+
+private fun BroadcastReceiver.handleWidgetRefreshBroadcast(
+    context: Context,
+    intent: Intent?,
+    tag: String
+) {
+    val action = intent?.action
+    Log.d(tag, "Received broadcast action: $action")
+
+    // Reschedule alarm for next midnight
+    MidnightAlarmScheduler.scheduleMidnightReset(context)
+
+    // Asynchronously update all widgets
+    val pendingResult = goAsync()
+    CoroutineScope(Dispatchers.Default).launch {
+        try {
+            WidgetUpdateHelper.updateAllWidgets(context)
+        } catch (e: Exception) {
+            Log.w(tag, "Error updating widgets on broadcast", e)
+        } finally {
+            pendingResult.finish()
         }
     }
 }

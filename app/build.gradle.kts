@@ -8,6 +8,24 @@ plugins {
 val buildNumber = providers.gradleProperty("versionCode").map { it.toInt() }.getOrElse(1)
 val versionNameProp = providers.gradleProperty("versionName").getOrElse("1.0.$buildNumber")
 
+val releaseStoreFileProp = providers.gradleProperty("RELEASE_STORE_FILE")
+  .orElse(providers.environmentVariable("RELEASE_STORE_FILE"))
+  .orNull
+val releaseStorePasswordProp = providers.gradleProperty("RELEASE_STORE_PASSWORD")
+  .orElse(providers.environmentVariable("RELEASE_STORE_PASSWORD"))
+  .orNull
+val releaseKeyAliasProp = providers.gradleProperty("RELEASE_KEY_ALIAS")
+  .orElse(providers.environmentVariable("RELEASE_KEY_ALIAS"))
+  .orNull
+val releaseKeyPasswordProp = providers.gradleProperty("RELEASE_KEY_PASSWORD")
+  .orElse(providers.environmentVariable("RELEASE_KEY_PASSWORD"))
+  .orNull
+val hasReleaseSigning = !releaseStoreFileProp.isNullOrBlank() &&
+  !releaseStorePasswordProp.isNullOrBlank() &&
+  !releaseKeyAliasProp.isNullOrBlank() &&
+  !releaseKeyPasswordProp.isNullOrBlank() &&
+  file(releaseStoreFileProp).exists()
+
 android {
   namespace = "com.fillmark.app"
   compileSdk = 36
@@ -19,20 +37,32 @@ android {
       keyAlias = "androiddebugkey"
       keyPassword = "android"
     }
+    if (hasReleaseSigning) {
+      create("release") {
+        storeFile = file(releaseStoreFileProp!!)
+        storePassword = releaseStorePasswordProp
+        keyAlias = releaseKeyAliasProp
+        keyPassword = releaseKeyPasswordProp
+      }
+    }
   }
 
   defaultConfig {
     applicationId = "ca.bralten.fillmark"
     minSdk = 29
-    targetSdk = 35
+    targetSdk = 36
     versionCode = buildNumber
     versionName = versionNameProp
   }
 
   buildTypes {
     release {
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      if (hasReleaseSigning) {
+        signingConfig = signingConfigs.getByName("release")
+      }
     }
     debug {
       signingConfig = signingConfigs.getByName("debug")
@@ -118,7 +148,4 @@ dependencies {
 
   // WorkManager
   implementation(libs.androidx.work.runtime.ktx)
-
-  // Material Icons Extended
-  implementation(libs.androidx.compose.material.icons.extended)
 }

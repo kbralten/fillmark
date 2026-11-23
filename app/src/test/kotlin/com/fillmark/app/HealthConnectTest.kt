@@ -27,7 +27,7 @@ class HealthConnectTest {
             endTime = endTime,
             endZoneOffset = zoneOffset,
             volume = Volume.milliliters(250.0),
-            metadata = Metadata(id = "test-id")
+            metadata = Metadata.manualEntryWithId(id = "test-id")
         )
 
         assertEquals("test-id", record.metadata.id)
@@ -54,7 +54,8 @@ class HealthConnectTest {
             startZoneOffset = zoneOffset,
             endTime = endTime,
             endZoneOffset = zoneOffset,
-            volume = Volume.milliliters(250.0)
+            volume = Volume.milliliters(250.0),
+            metadata = Metadata.manualEntry()
         )
 
         assertNotNull(record)
@@ -71,7 +72,8 @@ class HealthConnectTest {
             startZoneOffset = null,
             endTime = instant,
             endZoneOffset = null,
-            volume = Volume.milliliters(250.0)
+            volume = Volume.milliliters(250.0),
+            metadata = Metadata.manualEntry()
         )
     }
 
@@ -88,7 +90,8 @@ class HealthConnectTest {
             startZoneOffset = zoneOffset,
             endTime = endTime,
             endZoneOffset = zoneOffset,
-            volume = Volume.milliliters(500.0)
+            volume = Volume.milliliters(500.0),
+            metadata = Metadata.manualEntry()
         )
 
         assertNotNull(record)
@@ -112,7 +115,7 @@ class HealthConnectTest {
             endTime = endTime,
             endZoneOffset = zoneOffset,
             volume = Volume.milliliters(750.0),
-            metadata = Metadata(id = originalHcId)
+            metadata = Metadata.manualEntryWithId(id = originalHcId)
         )
 
         assertEquals(originalHcId, updatedRecord.metadata.id)
