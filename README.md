@@ -11,9 +11,10 @@ Fillmark is designed to make drink tracking effortless and friction-free. With o
 - 🔒 **Local-First & Zero-Auth:** No accounts, passwords, analytics, or developer/third-party cloud servers. All personal health data stays on your device (and, if Android Auto Backup is enabled on your phone, backs up solely to your own personal Google Account).
 - ⚡ **Instant Logging:** Record drinks in under a second using one-tap presets with quick undo support.
 - ⏱️ **Smart Waking-Hours Pacing:** Dynamic pacing tells you if you are ahead, on track, or behind schedule based on your custom wake and sleep hours.
-- 📱 **Home Screen Widgets:** Log water and monitor your progress directly from your home screen using reactive Jetpack Glance widgets.
+- 📱 **Home Screen Widgets & Shortcuts:** Log water and monitor your progress from your home screen with Jetpack Glance widgets (including quick Undo), a Quick Settings tile, and dynamic App Shortcuts.
 - 🔗 **Health Connect Sync:** Optional bidirectional synchronization with Android Health Connect to share data with your favorite fitness apps.
-- 📊 **Detailed Trends & Analytics:** Track intake across hourly, daily, weekly, monthly, and yearly intervals.
+- 📊 **Detailed Trends & Analytics:** Track intake across daily (cumulative & rate), weekly, monthly, 3-month, yearly, and all-time intervals with goal streaks and drink breakdowns.
+- 💾 **Local Backup & Export:** Export and restore full local backups as JSON, or export drink logs to CSV at any time.
 
 ---
 
@@ -22,30 +23,33 @@ Fillmark is designed to make drink tracking effortless and friction-free. With o
 ### 💧 Fast & Flexible Logging
 - **One-Tap Presets:** Instantly record drinks using preset containers (e.g., Glass, Coffee Mug, Water Bottle, Can, Tumbler).
 - **Custom Presets:** Tailor presets with custom labels, container icons, fluid volumes, drink categories, and colors.
-- **Drink Water Factors:** Account for beverages with different water retention properties (e.g., water vs. coffee or tea).
-- **Manual Logging:** Floating action button allows quick logging of arbitrary amounts, beverage types, and custom timestamps.
+- **Drink Hydration Factors:** Account for beverages with different water retention properties (e.g., water vs. coffee or tea), with a global toggle in Settings to count 1:1 raw volume instead.
+- **Manual Logging:** Floating action button allows quick logging of arbitrary amounts, beverage types, and custom past timestamps.
+- **Quick Settings Tile & App Shortcuts:** Log your top preset directly from Android's Quick Settings shade or long-press launcher shortcuts.
 - **Instant Undo:** 4-second quick undo snackbar prevents accidental entries.
 
 ### ⏱️ Daily Dashboard & Waking Hours Pacing
+- **First-Run Onboarding:** Guided 3-step setup with locale-aware unit defaults, daily goal selection, waking window, and optional Health Connect connection (automatically skipped for existing users).
 - **Real-Time Progress:** High-contrast progress meter displaying daily intake against your target (or standalone consumption if no target is set).
+- **Per-Day Goal Override:** Tap today's target on the Dashboard to adjust your goal for today only without altering past or future days.
 - **Adaptive Pacing Meter:** Calculates where your drinking level should be at any point in the day based on your wake-up and bedtime schedule, highlighting whether you are *ahead*, *on track*, or *behind*.
-- **Historical Target Preservation:** Adjusting today's target never alters past targets or historical compliance records.
+- **Historical Target Preservation:** Adjusting your default target in Settings preserves past daily targets and historical compliance records.
 
 ### 📱 Android Home Screen Widgets
-Powered by Jetpack Glance, Fillmark provides three interactive home screen widgets:
-1. **Progress Meter ($2 \times 2$ / $3 \times 2$):** Circular daily progress, goal percentage, and waking-hours pacing status.
-2. **Quick Log Bar ($4 \times 1$):** Instant one-tap logging buttons for your top presets right from your home screen.
-3. **Full Dashboard ($4 \times 2$ / $4 \times 3$):** Combines the progress meter, favorite preset buttons, and a quick-add shortcut for manual logging.
+Powered by Jetpack Glance, Fillmark provides three interactive home screen widgets (pin-able directly from Settings on supported launchers):
+1. **Progress Meter (4×1):** Luminous horizontal progress bar, goal percentage, consumed/target volume, and waking-hours pacing pill.
+2. **Quick Log Bar (4×1):** Instant one-tap logging buttons for your top presets right from your home screen, with 30-second Undo support.
+3. **Full Dashboard (4×2):** Combines the luminous progress bar and pacing status pill with your favorite preset buttons and quick Undo support.
 
 ### 📜 History & Record Management
 - Chronological day-by-day logs showing timestamps, drink types, container icons, and volumes.
 - Tap any record to edit its timestamp, beverage type, or volume.
-- Swipe-to-delete with confirmation.
+- One-tap delete with an instant Undo snackbar.
 
 ### 📈 Historical Analytics & Charts
-- **Day:** 24-hour breakdown of hourly intake.
-- **Week:** 7-day bar chart with daily target lines and weekly average.
-- **Month / 3 Months / Year / All Time:** Long-term trends and intake summaries to help you build lasting habits.
+- **Day:** Cumulative intake and hourly intake rate line charts with daily target and waking-hours pacing reference lines.
+- **Week:** 7-day bar chart with daily target lines, weekly average, and tap-a-bar day inspection.
+- **Month / 3 Months / Year / All Time:** Long-term trends, current & best goal streaks, and drink type breakdowns to help you build lasting habits.
 
 ### 🔄 Android Health Connect Integration
 - Optional bidirectional synchronization with Android's official Health Connect API (`HydrationRecord`).
@@ -53,9 +57,10 @@ Powered by Jetpack Glance, Fillmark provides three interactive home screen widge
 - Inbound sync pulls hydration entries logged in other apps without creating duplicate records.
 - Works entirely on-device; toggle sync or revoke permissions at any time.
 
-### ⚙️ Personalization & Preferences
-- Seamless switching between **Metric** ($\text{ml}$) and **Imperial** ($\text{fl oz}$). All data is stored in milliliters internally to prevent conversion drift.
-- Material 3 dynamic styling with full Edge-to-Edge Android support.
+### ⚙️ Personalization, Preferences & Local Data
+- Seamless switching between **Metric** (ml) and **Imperial** (fl oz). All data is stored in milliliters internally to prevent conversion drift.
+- **Appearance:** Light, Dark, and System theme modes with optional Material You dynamic color (Android 12+), full Edge-to-Edge support, and a responsive `NavigationRail` layout on tablets and foldables.
+- **Local Data Tools:** Export/restore full local JSON backups, export drink logs to CSV, or reset and clear all local data in Settings.
 
 ---
 
@@ -74,10 +79,10 @@ Fillmark is built with modern Android development standards and clean architectu
 
 ### Architecture & Tech Stack
 
-- **UI & Layout:** 100% [Jetpack Compose](https://developer.android.com/jetpack/compose) with Material 3 and Navigation 3.
+- **UI & Layout:** 100% [Jetpack Compose](https://developer.android.com/jetpack/compose) with Material 3 (dynamic color, bottom navigation bar, and responsive tablet `NavigationRail`).
 - **Home Screen Widgets:** [Jetpack Glance](https://developer.android.com/jetpack/compose/glance) with reactive state updates linked to database triggers.
 - **Architecture:** MVVM (Model-View-ViewModel) + Repository pattern with Kotlin Coroutines and Flows.
-- **Local Persistence:** [Room](https://developer.android.com/training/data-storage/room) (SQLite abstraction) for hydration records, daily targets, and presets; Jetpack DataStore for user preferences.
+- **Local Persistence:** [Room](https://developer.android.com/training/data-storage/room) (SQLite abstraction) for hydration records, daily targets, and presets; Jetpack DataStore for user preferences; `kotlinx.serialization` for local JSON backup/restore.
 - **Background Sync:** Android WorkManager for asynchronous Health Connect synchronization.
 - **Health Integration:** AndroidX Health Connect Client library (`androidx.health.connect:connect-client`).
 
@@ -85,12 +90,12 @@ Fillmark is built with modern Android development standards and clean architectu
 
 ```text
 app/src/main/kotlin/com/fillmark/app/
-├── core/         # Domain models, enums (DrinkType, PresetIcon), volume & time utilities
-├── data/         # Room entities, DAOs, Database definition, DataStore repository
-├── domain/       # Business logic (e.g., PacingCalculator)
+├── core/         # Domain models, enums (DrinkType, PresetIcon), shortcuts, volume & time utilities
+├── data/         # Room entities, DAOs, Database definition, DataStore repository, JSON/CSV backup
+├── domain/       # Business logic (PacingCalculator, DailyGraphCalculator, AnalyticsInsightsCalculator)
 ├── sync/         # Health Connect manager, sync worker, rationale activity
-├── ui/           # Jetpack Compose UI screens (Dashboard, History, Analytics, Settings)
-└── widget/       # Jetpack Glance widget providers and action callbacks
+├── ui/           # Jetpack Compose UI screens (Dashboard, History, Analytics, Settings, Onboarding)
+└── widget/       # Jetpack Glance widget providers, action callbacks, and Quick Settings tile
 ```
 
 ### Building the Project
