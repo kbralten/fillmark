@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -52,10 +51,10 @@ import com.fillmark.app.domain.PacingCalculator
 import com.fillmark.app.domain.PacingResult
 import com.fillmark.app.domain.PacingStatus
 import com.fillmark.app.ui.dashboard.components.parseHexColor
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
-import java.time.LocalTime
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
 class FullDashboardWidget : GlanceAppWidget() {
@@ -76,16 +75,11 @@ class FullDashboardWidget : GlanceAppWidget() {
         val initialPresets = database.presetDao().getAllPresets()
 
         provideContent {
-            val currentDate by produceState(initialValue = LocalDate.now()) {
-                while (true) {
-                    val now = LocalDate.now()
-                    if (value != now) {
-                        value = now
-                    }
-                    val millisUntilNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L)
-                    delay(millisUntilNextMinute.coerceAtLeast(1_000L))
-                }
-            }
+            val currentDateTime by remember {
+                WidgetTimingHelper.activeClockFlow()
+            }.collectAsState(initial = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))
+            val currentDate = currentDateTime.toLocalDate()
+            val currentTime = currentDateTime.toLocalTime()
 
             val startMillis = TimeUtils.startOfDayMillis(currentDate)
             val endMillis = TimeUtils.endOfDayMillis(currentDate)
@@ -122,7 +116,7 @@ class FullDashboardWidget : GlanceAppWidget() {
 
             val pacing = if (hasTarget && prefs.wakingPacingEnabled) {
                 PacingCalculator.evaluatePacing(
-                    currentTime = LocalTime.now(),
+                    currentTime = currentTime,
                     wakeTimeString = prefs.wakingHoursStart,
                     sleepTimeString = prefs.wakingHoursEnd,
                     currentVolumeMl = effectiveTotalMl,
@@ -144,8 +138,17 @@ class FullDashboardWidget : GlanceAppWidget() {
                 )
             }
 
-            val canUndo = prefs.lastWidgetLogRecordId != null &&
-                (System.currentTimeMillis() - prefs.lastWidgetLogTimeMillis) <= 30_000L
+            val canUndo by remember(prefs.lastWidgetLogRecordId, prefs.lastWidgetLogTimeMillis) {
+                WidgetTimingHelper.observeCanUndo(
+                    lastRecordId = prefs.lastWidgetLogRecordId,
+                    lastLogTimeMillis = prefs.lastWidgetLogTimeMillis
+                )
+            }.collectAsState(
+                initial = WidgetTimingHelper.isUndoAvailable(
+                    lastRecordId = prefs.lastWidgetLogRecordId,
+                    lastLogTimeMillis = prefs.lastWidgetLogTimeMillis
+                )
+            )
 
             FullDashboardContent(
                 hasTarget = hasTarget,

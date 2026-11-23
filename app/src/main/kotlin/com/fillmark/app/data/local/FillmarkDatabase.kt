@@ -11,9 +11,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.data.local.dao.DailyTargetDao
 import com.fillmark.app.data.local.dao.HydrationDao
+import com.fillmark.app.data.local.dao.PendingHealthConnectDeletionDao
 import com.fillmark.app.data.local.dao.PresetDao
 import com.fillmark.app.data.local.entity.DailyTargetEntity
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
+import com.fillmark.app.data.local.entity.PendingHealthConnectDeletionEntity
 import com.fillmark.app.data.local.entity.PresetEntity
 import java.util.UUID
 
@@ -21,15 +23,17 @@ import java.util.UUID
     entities = [
         HydrationRecordEntity::class,
         PresetEntity::class,
-        DailyTargetEntity::class
+        DailyTargetEntity::class,
+        PendingHealthConnectDeletionEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class FillmarkDatabase : RoomDatabase() {
     abstract fun hydrationDao(): HydrationDao
     abstract fun presetDao(): PresetDao
     abstract fun dailyTargetDao(): DailyTargetDao
+    abstract fun pendingHealthConnectDeletionDao(): PendingHealthConnectDeletionDao
 
     companion object {
         @Volatile
@@ -48,6 +52,14 @@ abstract class FillmarkDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `pending_hc_deletions` (`health_connect_id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`health_connect_id`))"
+                )
+            }
+        }
+
         fun getInstance(context: Context): FillmarkDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -56,7 +68,7 @@ abstract class FillmarkDatabase : RoomDatabase() {
                     "fillmark_database"
                 )
                     .addCallback(DatabaseCallback())
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration(false)
                     .build()
                 INSTANCE = instance

@@ -2,6 +2,7 @@ package com.fillmark.app.data.local
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
@@ -77,6 +78,63 @@ class UserPreferencesRepository(private val context: Context) {
             } else {
                 DisplayUnit.METRIC_ML
             }
+        }
+
+        internal fun applyRestoredPreferencesTo(
+            preferences: MutablePreferences,
+            displayUnit: DisplayUnit,
+            defaultDailyTargetMl: Double,
+            wakingHoursStart: String,
+            wakingHoursEnd: String,
+            wakingPacingEnabled: Boolean,
+            themeMode: ThemeMode,
+            dynamicColorEnabled: Boolean,
+            hydrationFactorsEnabled: Boolean
+        ) {
+            preferences[KEY_DISPLAY_UNIT] = displayUnit.name
+            preferences[KEY_DEFAULT_TARGET_ML] = defaultDailyTargetMl
+            preferences[KEY_WAKING_HOURS_START] = wakingHoursStart
+            preferences[KEY_WAKING_HOURS_END] = wakingHoursEnd
+            preferences[KEY_WAKING_PACING_ENABLED] = wakingPacingEnabled
+            preferences[KEY_THEME_MODE] = themeMode.name
+            preferences[KEY_DYNAMIC_COLOR_ENABLED] = dynamicColorEnabled
+            preferences[KEY_HYDRATION_FACTORS_ENABLED] = hydrationFactorsEnabled
+            preferences[KEY_ONBOARDING_COMPLETED] = true
+            // Pause Health Connect sync and reset sync tokens/undo state so restored records are not duplicated
+            preferences[KEY_HEALTH_CONNECT_SYNC_ENABLED] = false
+            preferences[KEY_HEALTH_CONNECT_BIDIRECTIONAL] = false
+            preferences.remove(KEY_HEALTH_CONNECT_CHANGES_TOKEN)
+            preferences[KEY_LAST_HEALTH_CONNECT_SYNC_MILLIS] = 0L
+            preferences.remove(KEY_LAST_WIDGET_LOG_RECORD_ID)
+            preferences.remove(KEY_LAST_WIDGET_LOG_LABEL)
+            preferences.remove(KEY_LAST_WIDGET_LOG_TIME_MILLIS)
+        }
+
+        internal fun hasHealthConnectChangesToken(preferences: Preferences): Boolean =
+            preferences[KEY_HEALTH_CONNECT_CHANGES_TOKEN] != null
+
+        internal fun isHealthConnectSyncEnabled(preferences: Preferences): Boolean =
+            preferences[KEY_HEALTH_CONNECT_SYNC_ENABLED] ?: false
+
+        internal fun isHealthConnectBidirectional(preferences: Preferences): Boolean =
+            preferences[KEY_HEALTH_CONNECT_BIDIRECTIONAL] ?: false
+
+        internal fun lastHealthConnectSyncMillis(preferences: Preferences): Long =
+            preferences[KEY_LAST_HEALTH_CONNECT_SYNC_MILLIS] ?: 0L
+
+        internal fun seedHealthConnectStateForTest(
+            preferences: MutablePreferences,
+            syncEnabled: Boolean,
+            bidirectional: Boolean,
+            changesToken: String?,
+            lastSyncMillis: Long
+        ) {
+            preferences[KEY_HEALTH_CONNECT_SYNC_ENABLED] = syncEnabled
+            preferences[KEY_HEALTH_CONNECT_BIDIRECTIONAL] = bidirectional
+            if (changesToken != null) {
+                preferences[KEY_HEALTH_CONNECT_CHANGES_TOKEN] = changesToken
+            }
+            preferences[KEY_LAST_HEALTH_CONNECT_SYNC_MILLIS] = lastSyncMillis
         }
     }
 
@@ -223,15 +281,17 @@ class UserPreferencesRepository(private val context: Context) {
         hydrationFactorsEnabled: Boolean
     ) {
         dataStore.edit { preferences ->
-            preferences[KEY_DISPLAY_UNIT] = displayUnit.name
-            preferences[KEY_DEFAULT_TARGET_ML] = defaultDailyTargetMl
-            preferences[KEY_WAKING_HOURS_START] = wakingHoursStart
-            preferences[KEY_WAKING_HOURS_END] = wakingHoursEnd
-            preferences[KEY_WAKING_PACING_ENABLED] = wakingPacingEnabled
-            preferences[KEY_THEME_MODE] = themeMode.name
-            preferences[KEY_DYNAMIC_COLOR_ENABLED] = dynamicColorEnabled
-            preferences[KEY_HYDRATION_FACTORS_ENABLED] = hydrationFactorsEnabled
-            preferences[KEY_ONBOARDING_COMPLETED] = true
+            applyRestoredPreferencesTo(
+                preferences = preferences,
+                displayUnit = displayUnit,
+                defaultDailyTargetMl = defaultDailyTargetMl,
+                wakingHoursStart = wakingHoursStart,
+                wakingHoursEnd = wakingHoursEnd,
+                wakingPacingEnabled = wakingPacingEnabled,
+                themeMode = themeMode,
+                dynamicColorEnabled = dynamicColorEnabled,
+                hydrationFactorsEnabled = hydrationFactorsEnabled
+            )
         }
     }
 }

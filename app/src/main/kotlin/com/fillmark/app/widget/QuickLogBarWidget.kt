@@ -63,8 +63,17 @@ class QuickLogBarWidget : GlanceAppWidget() {
                 prefsRepo.preferencesFlow
             }.collectAsState(initial = initialPrefs)
 
-            val canUndo = prefs.lastWidgetLogRecordId != null &&
-                (System.currentTimeMillis() - prefs.lastWidgetLogTimeMillis) <= 30_000L
+            val canUndo by remember(prefs.lastWidgetLogRecordId, prefs.lastWidgetLogTimeMillis) {
+                WidgetTimingHelper.observeCanUndo(
+                    lastRecordId = prefs.lastWidgetLogRecordId,
+                    lastLogTimeMillis = prefs.lastWidgetLogTimeMillis
+                )
+            }.collectAsState(
+                initial = WidgetTimingHelper.isUndoAvailable(
+                    lastRecordId = prefs.lastWidgetLogRecordId,
+                    lastLogTimeMillis = prefs.lastWidgetLogTimeMillis
+                )
+            )
 
             QuickLogBarContent(
                 presets = presets,

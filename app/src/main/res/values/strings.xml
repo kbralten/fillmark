@@ -206,11 +206,16 @@
     <string name="settings_pick_time_cd">Pick %1$s</string>
     <string name="settings_hc_title">Health Connect Integration</string>
     <string name="settings_hc_connected">Status: Connected and ready to sync.</string>
+    <string name="settings_hc_connected_outbound_only">Status: Outbound sync connected (write-only).</string>
+    <string name="settings_hc_connected_read_only">Status: Read permission granted (write permission needed for outbound sync).</string>
     <string name="settings_hc_needs_perms">Status: Health Connect available. Permissions required.</string>
     <string name="settings_hc_update_required">Status: Health Connect needs to be installed or updated.</string>
     <string name="settings_hc_unavailable">Status: Health Connect is not available on this device.</string>
     <string name="settings_hc_install_update">Install / Update Health Connect</string>
     <string name="settings_hc_grant_perms">Grant Health Connect Permissions</string>
+    <string name="settings_hc_grant_write_perm">Grant Write Permission</string>
+    <string name="settings_hc_grant_read_perm">Grant Read Permission for Inbound Sync</string>
+    <string name="settings_hc_inbound_needs_read">Grant Read permission to import drinks from other apps</string>
     <string name="settings_hc_outbound_sync">Enable Outbound Sync</string>
     <string name="settings_hc_inbound_sync">Bidirectional Inbound Sync</string>
     <string name="settings_hc_inbound_sync_desc">Import drinks logged in other fitness apps into Fillmark</string>

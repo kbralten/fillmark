@@ -50,11 +50,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.ShortcutHelper
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.UserPreferencesRepository
+import com.fillmark.app.sync.HealthConnectAvailabilityUi
 import com.fillmark.app.sync.HealthConnectManager
 import com.fillmark.app.ui.settings.TimePickerField
 import com.fillmark.app.ui.settings.TimePickerModalDialog
@@ -86,11 +88,23 @@ fun OnboardingScreen(
     var showSleepPicker by remember { mutableStateOf(false) }
     var healthConnectEnabled by remember { mutableStateOf(false) }
 
-    val hcAvailable = remember { hcManager.isAvailable() }
+    var hcSdkStatus by remember { mutableIntStateOf(hcManager.getSdkStatus()) }
+    val hcAvailability = HealthConnectManager.resolveAvailabilityUi(hcSdkStatus)
+
+    LifecycleResumeEffect(Unit) {
+        hcSdkStatus = hcManager.getSdkStatus()
+        scope.launch {
+            if (hcManager.isAvailable() && hcManager.hasWritePermission()) {
+                healthConnectEnabled = true
+            }
+        }
+        onPauseOrDispose {}
+    }
+
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) { granted ->
-        if (granted.containsAll(hcManager.permissions)) {
+        if (hcManager.writePermission in granted) {
             healthConnectEnabled = true
         }
     }
@@ -336,7 +350,7 @@ fun OnboardingScreen(
                                 }
                             }
 
-                            if (hcAvailable) {
+                            if (hcAvailability != HealthConnectAvailabilityUi.UNAVAILABLE) {
                                 Card(
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -352,22 +366,40 @@ fun OnboardingScreen(
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.SemiBold
                                         )
-                                        Text(
-                                            text = if (healthConnectEnabled) {
-                                                stringResource(R.string.onboarding_hc_connected)
-                                            } else {
-                                                stringResource(R.string.onboarding_hc_prompt)
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        if (!healthConnectEnabled) {
-                                            OutlinedButton(
-                                                onClick = { requestPermissionsLauncher.launch(hcManager.permissions) },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Text(stringResource(R.string.onboarding_hc_connect))
+                                        when (hcAvailability) {
+                                            HealthConnectAvailabilityUi.INSTALL_OR_UPDATE_REQUIRED -> {
+                                                Text(
+                                                    text = stringResource(R.string.settings_hc_update_required),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                OutlinedButton(
+                                                    onClick = { HealthConnectManager.openPlayStore(context) },
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Text(stringResource(R.string.settings_hc_install_update))
+                                                }
                                             }
+                                            HealthConnectAvailabilityUi.AVAILABLE -> {
+                                                Text(
+                                                    text = if (healthConnectEnabled) {
+                                                        stringResource(R.string.onboarding_hc_connected)
+                                                    } else {
+                                                        stringResource(R.string.onboarding_hc_prompt)
+                                                    },
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                if (!healthConnectEnabled) {
+                                                    OutlinedButton(
+                                                        onClick = { requestPermissionsLauncher.launch(hcManager.permissions) },
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Text(stringResource(R.string.onboarding_hc_connect))
+                                                    }
+                                                }
+                                            }
+                                            HealthConnectAvailabilityUi.UNAVAILABLE -> Unit
                                         }
                                     }
                                 }

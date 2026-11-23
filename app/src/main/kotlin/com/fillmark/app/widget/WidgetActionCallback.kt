@@ -45,6 +45,7 @@ class QuickLogActionCallback : ActionCallback {
         val prefsRepo = UserPreferencesRepository(context)
         val prefs = prefsRepo.preferencesFlow.first()
         prefsRepo.setLastWidgetLog(record.id, preset.label, now)
+        WidgetUndoCleanupWorker.schedule(context)
         val volumeStr = VolumeConverter.formatVolume(preset.volumeMl, prefs.displayUnit)
 
         withContext(Dispatchers.Main) {
@@ -70,6 +71,31 @@ class QuickLogActionCallback : ActionCallback {
 }
 
 class UndoWidgetLogActionCallback : ActionCallback {
+    internal companion object {
+        suspend fun executeUndo(
+            lastRecordId: String?,
+            lastLogTimeMillis: Long,
+            nowMillis: Long = System.currentTimeMillis(),
+            deleteRecord: suspend (String) -> Unit,
+            clearLastWidgetLog: suspend () -> Unit,
+            cancelCleanupWork: () -> Unit,
+            updateWidgets: suspend () -> Unit
+        ): Boolean {
+            val recordId = lastRecordId ?: return false
+            if (!WidgetTimingHelper.isUndoAvailable(recordId, lastLogTimeMillis, nowMillis)) {
+                clearLastWidgetLog()
+                cancelCleanupWork()
+                updateWidgets()
+                return false
+            }
+            deleteRecord(recordId)
+            clearLastWidgetLog()
+            cancelCleanupWork()
+            updateWidgets()
+            return true
+        }
+    }
+
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
@@ -77,16 +103,21 @@ class UndoWidgetLogActionCallback : ActionCallback {
     ) {
         val prefsRepo = UserPreferencesRepository(context)
         val prefs = prefsRepo.preferencesFlow.first()
-        val recordId = prefs.lastWidgetLogRecordId ?: return
         val label = prefs.lastWidgetLogLabel ?: "drink"
 
-        HydrationRepository(context).deleteRecordById(recordId)
-        prefsRepo.setLastWidgetLog(null, null, 0L)
+        val undone = executeUndo(
+            lastRecordId = prefs.lastWidgetLogRecordId,
+            lastLogTimeMillis = prefs.lastWidgetLogTimeMillis,
+            deleteRecord = { recordId -> HydrationRepository(context).deleteRecordById(recordId) },
+            clearLastWidgetLog = { prefsRepo.setLastWidgetLog(null, null, 0L) },
+            cancelCleanupWork = { WidgetUndoCleanupWorker.cancel(context) },
+            updateWidgets = { WidgetUpdateHelper.updateAllWidgets(context) }
+        )
 
-        withContext(Dispatchers.Main) {
-            Toast.makeText(context, "Undid $label", Toast.LENGTH_SHORT).show()
+        if (undone) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Undid $label", Toast.LENGTH_SHORT).show()
+            }
         }
-
-        WidgetUpdateHelper.updateAllWidgets(context)
     }
 }

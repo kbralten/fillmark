@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -46,10 +45,10 @@ import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.domain.PacingCalculator
 import com.fillmark.app.domain.PacingResult
 import com.fillmark.app.domain.PacingStatus
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
-import java.time.LocalTime
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
 class ProgressMeterWidget : GlanceAppWidget() {
@@ -69,16 +68,11 @@ class ProgressMeterWidget : GlanceAppWidget() {
         val initialPrefs = prefsRepo.preferencesFlow.first()
 
         provideContent {
-            val currentDate by produceState(initialValue = LocalDate.now()) {
-                while (true) {
-                    val now = LocalDate.now()
-                    if (value != now) {
-                        value = now
-                    }
-                    val millisUntilNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L)
-                    delay(millisUntilNextMinute.coerceAtLeast(1_000L))
-                }
-            }
+            val currentDateTime by remember {
+                WidgetTimingHelper.activeClockFlow()
+            }.collectAsState(initial = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))
+            val currentDate = currentDateTime.toLocalDate()
+            val currentTime = currentDateTime.toLocalTime()
 
             val startMillis = TimeUtils.startOfDayMillis(currentDate)
             val endMillis = TimeUtils.endOfDayMillis(currentDate)
@@ -111,7 +105,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
 
             val pacing = if (hasTarget && prefs.wakingPacingEnabled) {
                 PacingCalculator.evaluatePacing(
-                    currentTime = LocalTime.now(),
+                    currentTime = currentTime,
                     wakeTimeString = prefs.wakingHoursStart,
                     sleepTimeString = prefs.wakingHoursEnd,
                     currentVolumeMl = effectiveTotalMl,

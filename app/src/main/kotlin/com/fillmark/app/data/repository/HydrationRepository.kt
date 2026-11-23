@@ -1,21 +1,27 @@
 package com.fillmark.app.data.repository
 
 import android.content.Context
+import androidx.room.withTransaction
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.data.local.FillmarkDatabase
+import com.fillmark.app.data.local.UserPreferences
 import com.fillmark.app.data.local.UserPreferencesRepository
+import com.fillmark.app.data.local.dao.DailyTargetDao
+import com.fillmark.app.data.local.dao.HydrationDao
+import com.fillmark.app.data.local.dao.PendingHealthConnectDeletionDao
+import com.fillmark.app.data.local.dao.PresetDao
 import com.fillmark.app.data.local.entity.DailyTargetEntity
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
+import com.fillmark.app.data.local.entity.PendingHealthConnectDeletionEntity
 import com.fillmark.app.data.local.entity.PresetEntity
 import com.fillmark.app.sync.HealthConnectManager
 import com.fillmark.app.sync.HealthConnectSyncWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -31,16 +37,56 @@ data class DayHydrationSummary(
     val hydrationFactorsEnabled: Boolean = true
 )
 
-class HydrationRepository(
-    private val context: Context,
-    private val database: FillmarkDatabase = FillmarkDatabase.getInstance(context),
-    private val preferencesRepository: UserPreferencesRepository = UserPreferencesRepository(context)
+class HydrationRepository internal constructor(
+    private val hydrationDao: HydrationDao,
+    private val presetDao: PresetDao,
+    private val targetDao: DailyTargetDao,
+    private val pendingDeletionDao: PendingHealthConnectDeletionDao,
+    val preferencesFlow: Flow<UserPreferences>,
+    private val updateDefaultDailyTargetMlFn: suspend (Double) -> Unit,
+    private val resetPreferencesKeepOnboardingFn: suspend () -> Unit,
+    private val runInTransaction: suspend (suspend () -> Unit) -> Unit,
+    private val deleteFromHealthConnect: suspend (String) -> Boolean,
+    private val enqueueHealthConnectSync: () -> Unit,
+    private val cancelHealthConnectSync: () -> Unit
 ) {
-    private val hydrationDao = database.hydrationDao()
-    private val presetDao = database.presetDao()
-    private val targetDao = database.dailyTargetDao()
-
-    val preferencesFlow = preferencesRepository.preferencesFlow
+    constructor(
+        context: Context,
+        database: FillmarkDatabase = FillmarkDatabase.getInstance(context),
+        preferencesRepository: UserPreferencesRepository = UserPreferencesRepository(context)
+    ) : this(
+        hydrationDao = database.hydrationDao(),
+        presetDao = database.presetDao(),
+        targetDao = database.dailyTargetDao(),
+        pendingDeletionDao = database.pendingHealthConnectDeletionDao(),
+        preferencesFlow = preferencesRepository.preferencesFlow,
+        updateDefaultDailyTargetMlFn = { preferencesRepository.updateDefaultDailyTargetMl(it) },
+        resetPreferencesKeepOnboardingFn = { preferencesRepository.resetPreferencesKeepOnboarding() },
+        runInTransaction = { block -> database.withTransaction { block() } },
+        deleteFromHealthConnect = { hcId ->
+            val hcManager = HealthConnectManager(context)
+            if (hcManager.isAvailable() && hcManager.hasWritePermission()) {
+                hcManager.deleteRecord(hcId)
+            } else {
+                false
+            }
+        },
+        enqueueHealthConnectSync = {
+            try {
+                val syncRequest = OneTimeWorkRequestBuilder<HealthConnectSyncWorker>().build()
+                WorkManager.getInstance(context).enqueueUniqueWork(
+                    "HealthConnectOutboundSync",
+                    ExistingWorkPolicy.REPLACE,
+                    syncRequest
+                )
+            } catch (_: Exception) {
+                // Worker scheduling safe fallback
+            }
+        },
+        cancelHealthConnectSync = {
+            HealthConnectManager.cancelAllSyncWork(context)
+        }
+    )
 
     fun observePresets(): Flow<List<PresetEntity>> = presetDao.observeAllPresets()
 
@@ -79,9 +125,8 @@ class HydrationRepository(
 
         val recordsFlow = hydrationDao.observeRecordsBetween(startMillis, endMillis)
         val targetFlow = targetDao.observeTargetForDate(dateIso)
-        val prefsFlow = preferencesRepository.preferencesFlow
 
-        return combine(recordsFlow, targetFlow, prefsFlow) { records, targetEntity, prefs ->
+        return combine(recordsFlow, targetFlow, preferencesFlow) { records, targetEntity, prefs ->
             val effectiveTotal = records.sumOf { it.countedVolumeMl(prefs.hydrationFactorsEnabled) }
             val activeTarget = targetEntity?.targetMl ?: prefs.defaultDailyTargetMl
             val isOverridden = targetEntity != null && targetEntity.targetMl != prefs.defaultDailyTargetMl
@@ -109,7 +154,7 @@ class HydrationRepository(
      */
     suspend fun insertRecord(record: HydrationRecordEntity) {
         hydrationDao.insertRecord(record)
-        triggerHealthConnectSync()
+        enqueueHealthConnectSync()
     }
 
     /**
@@ -133,23 +178,28 @@ class HydrationRepository(
     suspend fun updateRecord(record: HydrationRecordEntity) {
         val updated = record.copy(lastModified = System.currentTimeMillis())
         hydrationDao.updateRecord(updated)
-        triggerHealthConnectSync()
+        enqueueHealthConnectSync()
     }
 
     suspend fun deleteRecordById(id: String) {
-        val record = hydrationDao.getRecordById(id)
-        hydrationDao.deleteRecordById(id)
-        if (record?.healthConnectId != null) {
-            try {
-                val hcManager = HealthConnectManager(context)
-                if (hcManager.isAvailable() && hcManager.hasAllPermissions()) {
-                    hcManager.deleteRecord(record.healthConnectId)
-                }
-            } catch (e: Exception) {
-                // Ignore failure on HC delete
+        var hcIdToDelete: String? = null
+        runInTransaction {
+            val record = hydrationDao.getRecordById(id)
+            hydrationDao.deleteRecordById(id)
+            val hcId = record?.healthConnectId
+            if (!hcId.isNullOrBlank()) {
+                hcIdToDelete = hcId
+                pendingDeletionDao.insert(PendingHealthConnectDeletionEntity(healthConnectId = hcId))
             }
         }
-        triggerHealthConnectSync()
+        val hcId = hcIdToDelete
+        if (hcId != null) {
+            val deleted = runCatching { deleteFromHealthConnect(hcId) }.getOrDefault(false)
+            if (deleted) {
+                pendingDeletionDao.deleteByHcId(hcId)
+            }
+        }
+        enqueueHealthConnectSync()
     }
 
     /**
@@ -157,8 +207,7 @@ class HydrationRepository(
      */
     fun observeTargetForDate(dateIso: String): Flow<Double> {
         val targetFlow = targetDao.observeTargetForDate(dateIso)
-        val prefsFlow = preferencesRepository.preferencesFlow
-        return combine(targetFlow, prefsFlow) { entity, prefs ->
+        return combine(targetFlow, preferencesFlow) { entity, prefs ->
             entity?.targetMl ?: prefs.defaultDailyTargetMl
         }
     }
@@ -176,11 +225,15 @@ class HydrationRepository(
     suspend fun hasAnyRecords(): Boolean = hydrationDao.getEarliestRecordTimestamp() != null
 
     suspend fun clearAllData() {
-        hydrationDao.deleteAllRecords()
-        targetDao.deleteAllTargets()
-        presetDao.deleteAllPresets()
-        presetDao.insertPresets(FillmarkDatabase.DEFAULT_PRESETS)
-        preferencesRepository.resetPreferencesKeepOnboarding()
+        cancelHealthConnectSync()
+        runInTransaction {
+            hydrationDao.deleteAllRecords()
+            targetDao.deleteAllTargets()
+            presetDao.deleteAllPresets()
+            pendingDeletionDao.deleteAll()
+            presetDao.insertPresets(FillmarkDatabase.DEFAULT_PRESETS)
+        }
+        resetPreferencesKeepOnboardingFn()
     }
 
     /**
@@ -191,7 +244,7 @@ class HydrationRepository(
         newTargetMl: Double,
         zoneId: ZoneId = ZoneId.systemDefault()
     ) {
-        val oldTargetMl = preferencesRepository.preferencesFlow.first().defaultDailyTargetMl
+        val oldTargetMl = preferencesFlow.first().defaultDailyTargetMl
         val today = LocalDate.now(zoneId)
         val todayIso = today.format(DateTimeFormatter.ISO_LOCAL_DATE)
 
@@ -208,7 +261,7 @@ class HydrationRepository(
         }
 
         targetDao.upsertTarget(DailyTargetEntity(dateString = todayIso, targetMl = newTargetMl))
-        preferencesRepository.updateDefaultDailyTargetMl(newTargetMl)
+        updateDefaultDailyTargetMlFn(newTargetMl)
     }
 
     companion object {
@@ -231,18 +284,4 @@ class HydrationRepository(
     suspend fun getRecordsBetween(startMillis: Long, endMillis: Long): List<HydrationRecordEntity> {
         return hydrationDao.getRecordsBetween(startMillis, endMillis)
     }
-
-    private fun triggerHealthConnectSync() {
-        try {
-            val syncRequest = OneTimeWorkRequestBuilder<HealthConnectSyncWorker>().build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                "HealthConnectOutboundSync",
-                ExistingWorkPolicy.REPLACE,
-                syncRequest
-            )
-        } catch (e: Exception) {
-            // Worker scheduling safe fallback
-        }
-    }
 }
-
