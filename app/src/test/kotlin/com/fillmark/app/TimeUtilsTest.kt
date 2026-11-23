@@ -5,7 +5,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
+import java.util.Locale
 
 class TimeUtilsTest {
 
@@ -40,10 +42,10 @@ class TimeUtilsTest {
 
     @Test
     fun testFormatTimeString() {
-        val morning = TimeUtils.formatTimeString("07:00")
+        val morning = TimeUtils.formatTimeString("07:00", locale = Locale.US)
         assertEquals("7:00 AM", morning)
 
-        val night = TimeUtils.formatTimeString("23:00")
+        val night = TimeUtils.formatTimeString("23:00", locale = Locale.US)
         assertEquals("11:00 PM", night)
     }
 
@@ -82,9 +84,47 @@ class TimeUtilsTest {
         val yesterdayMillis = TimeUtils.toEpochMillis(yesterday, time, zone)
         val pastMillis = TimeUtils.toEpochMillis(pastDate, time, zone)
 
-        assertEquals("Today at 3:45 PM", TimeUtils.formatDateTime(todayMillis, zone))
-        assertEquals("Yesterday at 3:45 PM", TimeUtils.formatDateTime(yesterdayMillis, zone))
-        assertEquals("May 12, 2025 at 3:45 PM", TimeUtils.formatDateTime(pastMillis, zone))
+        assertEquals("Today at 3:45 PM", TimeUtils.formatDateTime(todayMillis, zone, locale = Locale.US))
+        assertEquals("Yesterday at 3:45 PM", TimeUtils.formatDateTime(yesterdayMillis, zone, locale = Locale.US))
+        assertEquals("May 12, 2025 at 3:45 PM", TimeUtils.formatDateTime(pastMillis, zone, locale = Locale.US))
+    }
+
+    @Test
+    fun testFormatTime24HourAnd12Hour() {
+        val zone = ZoneId.of("UTC")
+        val date = LocalDate.of(2026, 11, 7)
+        val afternoon = LocalTime.of(15, 5)
+        val millis = TimeUtils.toEpochMillis(date, afternoon, zone)
+
+        assertEquals("15:05", TimeUtils.formatTime(afternoon, is24Hour = true, locale = Locale.US))
+        assertEquals("3:05 PM", TimeUtils.formatTime(afternoon, is24Hour = false, locale = Locale.US))
+        assertEquals("15:05", TimeUtils.formatTime(millis, zone, is24Hour = true, locale = Locale.US))
+        assertEquals("3:05 PM", TimeUtils.formatTime(millis, zone, is24Hour = false, locale = Locale.US))
+    }
+
+    @Test
+    fun testFormatTimeString24Hour() {
+        assertEquals("07:00", TimeUtils.formatTimeString("07:00", is24Hour = true, locale = Locale.US))
+        assertEquals("23:00", TimeUtils.formatTimeString("23:00", is24Hour = true, locale = Locale.US))
+        assertEquals("7:00 AM", TimeUtils.formatTimeString("07:00", is24Hour = false, locale = Locale.US))
+        assertEquals("11:00 PM", TimeUtils.formatTimeString("23:00", is24Hour = false, locale = Locale.US))
+    }
+
+    @Test
+    fun testFormatDateTime24Hour() {
+        val zone = ZoneId.of("UTC")
+        val today = LocalDate.now(zone)
+        val yesterday = today.minusDays(1)
+        val pastDate = LocalDate.of(2025, 5, 12)
+        val time = LocalTime.of(15, 45)
+
+        val todayMillis = TimeUtils.toEpochMillis(today, time, zone)
+        val yesterdayMillis = TimeUtils.toEpochMillis(yesterday, time, zone)
+        val pastMillis = TimeUtils.toEpochMillis(pastDate, time, zone)
+
+        assertEquals("Today at 15:45", TimeUtils.formatDateTime(todayMillis, zone, is24Hour = true, locale = Locale.US))
+        assertEquals("Yesterday at 15:45", TimeUtils.formatDateTime(yesterdayMillis, zone, is24Hour = true, locale = Locale.US))
+        assertEquals("May 12, 2025 at 15:45", TimeUtils.formatDateTime(pastMillis, zone, is24Hour = true, locale = Locale.US))
     }
 }
 

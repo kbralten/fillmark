@@ -3,6 +3,7 @@ package com.fillmark.app.ui.settings
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -10,6 +11,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -71,8 +74,9 @@ import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.ThemeMode
 import com.fillmark.app.sync.HealthConnectManager
 import java.time.LocalDate
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
@@ -80,6 +84,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
     val hcManager = remember { HealthConnectManager(context) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -152,9 +157,11 @@ fun SettingsScreen(
     val targetInternalMl = VolumeConverter.toInternalMl(parsedTarget, uiState.displayUnit)
     val targetErrorText = when {
         !hasTarget -> null
-        targetInput.isBlank() || targetInternalMl <= 0 -> "Enter a target greater than 0"
-        targetInternalMl > VolumeConverter.MAX_DAILY_TARGET_ML ->
-            "Max daily target is ${VolumeConverter.formatVolume(VolumeConverter.MAX_DAILY_TARGET_ML, uiState.displayUnit)}"
+        targetInput.isBlank() || targetInternalMl <= 0 -> stringResource(R.string.error_target_gt_zero)
+        targetInternalMl > VolumeConverter.MAX_DAILY_TARGET_ML -> stringResource(
+            R.string.error_max_daily_target,
+            VolumeConverter.formatVolume(VolumeConverter.MAX_DAILY_TARGET_ML, uiState.displayUnit)
+        )
         else -> null
     }
 
@@ -164,6 +171,9 @@ fun SettingsScreen(
     val privacyUrl = stringResource(R.string.privacy_policy_url)
     val githubIssuesUrl = stringResource(R.string.github_issues_url)
     val githubRepoUrl = stringResource(R.string.github_repo_url)
+    val todayLabel = stringResource(R.string.today)
+    val yesterdayLabel = stringResource(R.string.yesterday)
+    val atFormat = stringResource(R.string.date_at_time)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -179,7 +189,7 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Text(
-                text = "Settings",
+                text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -194,13 +204,16 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Appearance",
+                        text = stringResource(R.string.settings_appearance),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         ThemeMode.entries.forEach { mode ->
                             FilterChip(
                                 selected = uiState.themeMode == mode,
@@ -218,12 +231,12 @@ fun SettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Dynamic Color (Material You)",
+                                    text = stringResource(R.string.settings_dynamic_color),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Match app colors to your wallpaper",
+                                    text = stringResource(R.string.settings_dynamic_color_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -246,22 +259,25 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Display Units",
+                        text = stringResource(R.string.settings_display_units),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         FilterChip(
                             selected = uiState.displayUnit == DisplayUnit.METRIC_ML,
                             onClick = { viewModel.setDisplayUnit(DisplayUnit.METRIC_ML) },
-                            label = { Text("Metric (ml)") }
+                            label = { Text(stringResource(R.string.unit_metric_full)) }
                         )
                         FilterChip(
                             selected = uiState.displayUnit == DisplayUnit.IMPERIAL_FL_OZ,
                             onClick = { viewModel.setDisplayUnit(DisplayUnit.IMPERIAL_FL_OZ) },
-                            label = { Text("Imperial (fl oz)") }
+                            label = { Text(stringResource(R.string.unit_imperial_full)) }
                         )
                     }
                 }
@@ -282,13 +298,17 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Daily Target Goal",
+                                text = stringResource(R.string.settings_daily_goal),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (hasTarget) "Track intake towards a daily goal" else "No goal set (displays intake in big numbers)",
+                                text = if (hasTarget) {
+                                    stringResource(R.string.settings_daily_goal_desc_on)
+                                } else {
+                                    stringResource(R.string.settings_daily_goal_desc_off)
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -324,7 +344,7 @@ fun SettingsScreen(
                                     }
                                 }
                             },
-                            label = { Text("Daily Target") },
+                            label = { Text(stringResource(R.string.settings_daily_target_label)) },
                             suffix = { Text(uiState.displayUnit.symbol) },
                             singleLine = true,
                             isError = targetErrorText != null,
@@ -345,16 +365,16 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Drink Hydration Factors",
+                                text = stringResource(R.string.settings_hydration_factors),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = if (uiState.hydrationFactorsEnabled) {
-                                    "Adjust effective water by drink type (e.g., 0.85x for coffee)"
+                                    stringResource(R.string.settings_hydration_factors_on)
                                 } else {
-                                    "Disabled: all drinks count 1:1 by raw volume"
+                                    stringResource(R.string.settings_hydration_factors_off)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -383,13 +403,13 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Waking Hours Pacing",
+                                text = stringResource(R.string.settings_waking_pacing),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Calculate expected progress based on waking schedule",
+                                text = stringResource(R.string.settings_waking_pacing_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -409,13 +429,13 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             TimePickerField(
-                                label = "Wake Time",
+                                label = stringResource(R.string.settings_wake_time),
                                 timeStr = uiState.wakingHoursStart,
                                 onClick = { showWakeTimePicker = true },
                                 modifier = Modifier.weight(1f)
                             )
                             TimePickerField(
-                                label = "Sleep Time",
+                                label = stringResource(R.string.settings_sleep_time),
                                 timeStr = uiState.wakingHoursEnd,
                                 onClick = { showSleepTimePicker = true },
                                 modifier = Modifier.weight(1f)
@@ -434,7 +454,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Health Connect Integration",
+                        text = stringResource(R.string.settings_hc_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -443,13 +463,13 @@ fun SettingsScreen(
                     Text(
                         text = when {
                             uiState.isHealthConnectAvailable && uiState.hasHealthConnectPermissions ->
-                                "Status: Connected and ready to sync."
+                                stringResource(R.string.settings_hc_connected)
                             uiState.isHealthConnectAvailable ->
-                                "Status: Health Connect available. Permissions required."
+                                stringResource(R.string.settings_hc_needs_perms)
                             uiState.healthConnectSdkStatus == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
-                                "Status: Health Connect needs to be installed or updated."
+                                stringResource(R.string.settings_hc_update_required)
                             else ->
-                                "Status: Health Connect is not available on this device."
+                                stringResource(R.string.settings_hc_unavailable)
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (uiState.hasHealthConnectPermissions) {
@@ -483,7 +503,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Install / Update Health Connect")
+                            Text(stringResource(R.string.settings_hc_install_update))
                         }
                     } else if (uiState.isHealthConnectAvailable && !uiState.hasHealthConnectPermissions) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -493,7 +513,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Grant Health Connect Permissions")
+                            Text(stringResource(R.string.settings_hc_grant_perms))
                         }
                     }
 
@@ -505,7 +525,7 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "Enable Outbound Sync",
+                                text = stringResource(R.string.settings_hc_outbound_sync),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -526,12 +546,12 @@ fun SettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    "Bidirectional Inbound Sync",
+                                    text = stringResource(R.string.settings_hc_inbound_sync),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    "Import drinks logged in other fitness apps into Fillmark",
+                                    text = stringResource(R.string.settings_hc_inbound_sync_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -548,9 +568,16 @@ fun SettingsScreen(
                         if (uiState.healthConnectSyncEnabled) {
                             Spacer(modifier = Modifier.height(14.dp))
                             val lastSyncText = if (uiState.lastHealthConnectSyncMillis > 0L) {
-                                "Last synced: ${TimeUtils.formatDateTime(uiState.lastHealthConnectSyncMillis)}"
+                                val formatted = TimeUtils.formatDateTime(
+                                    epochMillis = uiState.lastHealthConnectSyncMillis,
+                                    is24Hour = is24Hour,
+                                    todayLabel = todayLabel,
+                                    yesterdayLabel = yesterdayLabel,
+                                    atFormat = atFormat
+                                )
+                                stringResource(R.string.settings_hc_last_synced, formatted)
                             } else {
-                                "Last synced: Never"
+                                stringResource(R.string.settings_hc_last_synced_never)
                             }
                             Text(
                                 text = lastSyncText,
@@ -569,9 +596,9 @@ fun SettingsScreen(
                                         strokeWidth = 2.dp
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Syncing...")
+                                    Text(stringResource(R.string.settings_hc_syncing))
                                 } else {
-                                    Text("Sync Now")
+                                    Text(stringResource(R.string.settings_hc_sync_now))
                                 }
                             }
                         }
@@ -591,13 +618,13 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Data & Backup",
+                        text = stringResource(R.string.settings_data_backup),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Export your drink history, presets, and targets locally to transfer devices or analyze in a spreadsheet.",
+                        text = stringResource(R.string.settings_data_backup_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -610,14 +637,14 @@ fun SettingsScreen(
                             enabled = !uiState.isBackupBusy,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Export JSON")
+                            Text(stringResource(R.string.settings_export_json))
                         }
                         OutlinedButton(
                             onClick = { restoreJsonLauncher.launch(arrayOf("application/json", "*/*")) },
                             enabled = !uiState.isBackupBusy,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Restore JSON")
+                            Text(stringResource(R.string.settings_restore_json))
                         }
                     }
                     OutlinedButton(
@@ -625,7 +652,7 @@ fun SettingsScreen(
                         enabled = !uiState.isBackupBusy,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Export Drink Logs (CSV)")
+                        Text(stringResource(R.string.settings_export_csv))
                     }
                     TextButton(
                         onClick = { showClearDataConfirm = true },
@@ -633,7 +660,7 @@ fun SettingsScreen(
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Reset & Clear All Local Data")
+                        Text(stringResource(R.string.settings_clear_all))
                     }
                 }
             }
@@ -649,14 +676,14 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Home Screen Widgets",
+                            text = stringResource(R.string.settings_widgets_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Quickly add Fillmark widgets to your home screen",
+                            text = stringResource(R.string.settings_widgets_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -676,7 +703,7 @@ fun SettingsScreen(
                                 },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Full Widget", style = MaterialTheme.typography.labelMedium)
+                                Text(stringResource(R.string.settings_widget_full), style = MaterialTheme.typography.labelMedium)
                             }
 
                             OutlinedButton(
@@ -689,7 +716,7 @@ fun SettingsScreen(
                                 },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Progress (3x1)", style = MaterialTheme.typography.labelMedium)
+                                Text(stringResource(R.string.settings_widget_progress), style = MaterialTheme.typography.labelMedium)
                             }
 
                             OutlinedButton(
@@ -702,7 +729,7 @@ fun SettingsScreen(
                                 },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Quick Bar", style = MaterialTheme.typography.labelMedium)
+                                Text(stringResource(R.string.settings_widget_quick_bar), style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
@@ -721,18 +748,22 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "About Fillmark",
+                        text = stringResource(R.string.settings_about_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        text = stringResource(
+                            R.string.settings_version_format,
+                            BuildConfig.VERSION_NAME,
+                            BuildConfig.VERSION_CODE
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Fillmark is for general wellness tracking only and is not a medical device.",
+                        text = stringResource(R.string.wellness_disclaimer),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -748,7 +779,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Privacy Policy", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.settings_privacy_policy), style = MaterialTheme.typography.labelMedium)
                         }
                         OutlinedButton(
                             onClick = {
@@ -758,14 +789,14 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Report Bug", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.settings_report_bug), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                     TextButton(
                         onClick = { showLicensesDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Open-Source License (GPL-3.0)")
+                        Text(stringResource(R.string.settings_open_source_license))
                     }
                 }
             }
@@ -776,7 +807,7 @@ fun SettingsScreen(
 
     if (showWakeTimePicker) {
         TimePickerModalDialog(
-            title = "Set Wake Time",
+            title = stringResource(R.string.settings_set_wake_time),
             initialTime = uiState.wakingHoursStart,
             onDismiss = { showWakeTimePicker = false },
             onConfirm = { newTime ->
@@ -788,7 +819,7 @@ fun SettingsScreen(
 
     if (showSleepTimePicker) {
         TimePickerModalDialog(
-            title = "Set Sleep Time",
+            title = stringResource(R.string.settings_set_sleep_time),
             initialTime = uiState.wakingHoursEnd,
             onDismiss = { showSleepTimePicker = false },
             onConfirm = { newTime ->
@@ -801,10 +832,8 @@ fun SettingsScreen(
     pendingRestoreUri?.let { uri ->
         AlertDialog(
             onDismissRequest = { pendingRestoreUri = null },
-            title = { Text("Restore Backup?", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("Restoring a backup replaces your current local drink logs, presets, and daily targets with the contents of the selected file.")
-            },
+            title = { Text(stringResource(R.string.settings_restore_confirm_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.settings_restore_confirm_body)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -812,12 +841,12 @@ fun SettingsScreen(
                         pendingRestoreUri = null
                     }
                 ) {
-                    Text("Restore")
+                    Text(stringResource(R.string.action_restore))
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { pendingRestoreUri = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -826,10 +855,8 @@ fun SettingsScreen(
     if (showClearDataConfirm) {
         AlertDialog(
             onDismissRequest = { showClearDataConfirm = false },
-            title = { Text("Clear All Local Data?", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("This permanently deletes all local drink logs, custom presets, and daily target history on this device.")
-            },
+            title = { Text(stringResource(R.string.settings_clear_confirm_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.settings_clear_confirm_body)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -838,12 +865,12 @@ fun SettingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Delete Everything")
+                    Text(stringResource(R.string.settings_delete_everything))
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { showClearDataConfirm = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -852,12 +879,12 @@ fun SettingsScreen(
     if (showLicensesDialog) {
         AlertDialog(
             onDismissRequest = { showLicensesDialog = false },
-            title = { Text("Open-Source License", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.settings_license_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Fillmark is free, open-source software licensed under the GNU General Public License v3.0 (GPL-3.0).")
+                    Text(stringResource(R.string.settings_license_dialog_gpl))
                     Text(
-                        "Built with Android Jetpack (Compose, Room, DataStore, Glance, WorkManager, Health Connect) and Kotlinx Serialization (Apache 2.0).",
+                        text = stringResource(R.string.settings_license_dialog_libs),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -865,7 +892,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 Button(onClick = { showLicensesDialog = false }) {
-                    Text("Close")
+                    Text(stringResource(R.string.action_close))
                 }
             },
             dismissButton = {
@@ -876,7 +903,7 @@ fun SettingsScreen(
                         }
                     }
                 ) {
-                    Text("Source Code")
+                    Text(stringResource(R.string.settings_source_code))
                 }
             }
         )
@@ -890,6 +917,9 @@ fun TimePickerField(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
+
     Surface(
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -909,14 +939,14 @@ fun TimePickerField(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = TimeUtils.formatTimeString(timeStr),
+                    text = TimeUtils.formatTimeString(timeStr, is24Hour = is24Hour),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Icon(
                     imageVector = Icons.Default.Schedule,
-                    contentDescription = "Pick $label",
+                    contentDescription = stringResource(R.string.settings_pick_time_cd, label),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -933,11 +963,13 @@ fun TimePickerModalDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
     val initialLocalTime = TimeUtils.parseTimeString(initialTime)
     val timePickerState = rememberTimePickerState(
         initialHour = initialLocalTime.hour,
         initialMinute = initialLocalTime.minute,
-        is24Hour = false
+        is24Hour = is24Hour
     )
 
     AlertDialog(
@@ -960,16 +992,16 @@ fun TimePickerModalDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val formatted = String.format(java.util.Locale.US, "%02d:%02d", timePickerState.hour, timePickerState.minute)
+                    val formatted = String.format(Locale.US, "%02d:%02d", timePickerState.hour, timePickerState.minute)
                     onConfirm(formatted)
                 }
             ) {
-                Text("OK")
+                Text(stringResource(R.string.action_ok))
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )

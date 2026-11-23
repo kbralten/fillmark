@@ -7,13 +7,16 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,9 +34,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.VolumeConverter
@@ -55,25 +60,25 @@ fun QuickPresetBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 4.dp),
+                .padding(start = 20.dp, end = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Quick Log",
+                text = stringResource(R.string.quick_log_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
             IconButton(
                 onClick = onCustomizePresets,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Tune,
-                    contentDescription = "Customize presets",
+                    contentDescription = stringResource(R.string.customize_presets_cd),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(19.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -81,6 +86,7 @@ fun QuickPresetBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(IntrinsicSize.Max)
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -103,14 +109,16 @@ fun QuickPresetBar(
                 ),
                 border = BorderStroke(1.dp, FillmarkCyan.copy(alpha = 0.35f)),
                 modifier = Modifier
-                    .width(90.dp)
-                    .height(118.dp)
+                    .widthIn(min = 90.dp)
+                    .heightIn(min = 118.dp)
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(16.dp))
                     .combinedClickable(onClick = onAddPreset)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .fillMaxHeight()
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
@@ -118,13 +126,13 @@ fun QuickPresetBar(
                     Spacer(modifier = Modifier.weight(1f))
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Add custom preset",
+                        contentDescription = stringResource(R.string.add_custom_preset_cd),
                         tint = FillmarkCyan,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "New",
+                        text = stringResource(R.string.quick_preset_new),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = FillmarkCyan
@@ -154,8 +162,9 @@ private fun PresetCard(
         ),
         border = BorderStroke(1.dp, presetColor.copy(alpha = 0.35f)),
         modifier = Modifier
-            .width(104.dp)
-            .height(118.dp)
+            .widthIn(min = 104.dp, max = 160.dp)
+            .heightIn(min = 118.dp)
+            .fillMaxHeight()
             .clip(RoundedCornerShape(16.dp))
             .combinedClickable(
                 onClick = onClick,
@@ -164,14 +173,14 @@ private fun PresetCard(
     ) {
         Column(
             modifier = Modifier
+                .fillMaxHeight()
                 .padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             val iconRes = PresetIcon.getDrawableRes(preset.iconKey)
             Box(
-                modifier = Modifier
-                    .size(34.dp),
+                modifier = Modifier.size(34.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
                 Icon(
@@ -202,14 +211,14 @@ private fun PresetCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "+$volumeStr",
+                    text = stringResource(R.string.quick_preset_plus_volume, volumeStr),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = presetColor
                 )
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Log",
+                    contentDescription = stringResource(R.string.quick_preset_log_cd),
                     tint = presetColor.copy(alpha = 0.85f),
                     modifier = Modifier.size(15.dp)
                 )

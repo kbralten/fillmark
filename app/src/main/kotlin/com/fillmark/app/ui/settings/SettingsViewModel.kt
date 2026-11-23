@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.ShortcutHelper
 import com.fillmark.app.core.VolumeConverter
@@ -186,10 +187,13 @@ class SettingsViewModel @JvmOverloads constructor(
     fun exportBackupJson(uri: Uri) {
         viewModelScope.launch {
             _uiState.update { it.copy(isBackupBusy = true) }
+            val app = getApplication<Application>()
             val message = runCatching {
-                val res = BackupManager.exportBackupToUri(getApplication(), uri)
-                "Exported ${res.recordsCount} logs and ${res.presetsCount} presets"
-            }.getOrElse { "Export failed: ${it.localizedMessage ?: "Unknown error"}" }
+                val res = BackupManager.exportBackupToUri(app, uri)
+                app.getString(R.string.settings_exported_backup, res.recordsCount, res.presetsCount)
+            }.getOrElse {
+                app.getString(R.string.settings_export_failed, it.localizedMessage ?: app.getString(R.string.error_unknown))
+            }
             _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
         }
     }
@@ -197,10 +201,13 @@ class SettingsViewModel @JvmOverloads constructor(
     fun restoreBackupJson(uri: Uri) {
         viewModelScope.launch {
             _uiState.update { it.copy(isBackupBusy = true) }
+            val app = getApplication<Application>()
             val message = runCatching {
-                val res = BackupManager.restoreBackupFromUri(getApplication(), uri)
-                "Restored ${res.recordsCount} logs and ${res.presetsCount} presets"
-            }.getOrElse { "Restore failed: ${it.localizedMessage ?: "Invalid backup file"}" }
+                val res = BackupManager.restoreBackupFromUri(app, uri)
+                app.getString(R.string.settings_restored_backup, res.recordsCount, res.presetsCount)
+            }.getOrElse {
+                app.getString(R.string.settings_restore_failed, it.localizedMessage ?: app.getString(R.string.error_invalid_backup))
+            }
             _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
         }
     }
@@ -208,10 +215,13 @@ class SettingsViewModel @JvmOverloads constructor(
     fun exportLogsCsv(uri: Uri) {
         viewModelScope.launch {
             _uiState.update { it.copy(isBackupBusy = true) }
+            val app = getApplication<Application>()
             val message = runCatching {
-                val count = BackupManager.exportCsvToUri(getApplication(), uri)
-                "Exported $count drink logs to CSV"
-            }.getOrElse { "CSV export failed: ${it.localizedMessage ?: "Unknown error"}" }
+                val count = BackupManager.exportCsvToUri(app, uri)
+                app.getString(R.string.settings_exported_csv, count)
+            }.getOrElse {
+                app.getString(R.string.settings_csv_failed, it.localizedMessage ?: app.getString(R.string.error_unknown))
+            }
             _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
         }
     }
@@ -219,12 +229,15 @@ class SettingsViewModel @JvmOverloads constructor(
     fun clearAllData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isBackupBusy = true) }
+            val app = getApplication<Application>()
             val message = runCatching {
                 hydrationRepository.clearAllData()
-                WidgetUpdateHelper.updateAllWidgets(getApplication())
-                ShortcutHelper.updateShortcuts(getApplication())
-                "All local data cleared"
-            }.getOrElse { "Clear failed: ${it.localizedMessage ?: "Unknown error"}" }
+                WidgetUpdateHelper.updateAllWidgets(app)
+                ShortcutHelper.updateShortcuts(app)
+                app.getString(R.string.settings_cleared_data)
+            }.getOrElse {
+                app.getString(R.string.settings_clear_failed, it.localizedMessage ?: app.getString(R.string.error_unknown))
+            }
             _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
         }
     }

@@ -125,7 +125,7 @@ class MainActivity : ComponentActivity() {
         }
         if (openManual) {
             pendingOpenManualLog = true
-            intent?.removeExtra(ShortcutHelper.EXTRA_OPEN_MANUAL_LOG)
+            intent.removeExtra(ShortcutHelper.EXTRA_OPEN_MANUAL_LOG)
         }
     }
 

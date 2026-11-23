@@ -1,9 +1,9 @@
 package com.fillmark.app.ui.dashboard
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,12 +55,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
+import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
@@ -86,6 +93,7 @@ fun DashboardScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val undoActionLabel = stringResource(R.string.action_undo)
 
     LaunchedEffect(pendingShortcutPresetId, pendingOpenManualLog) {
         if (pendingShortcutPresetId != null) {
@@ -108,7 +116,7 @@ fun DashboardScreen(
         if (msg != null) {
             val result = snackbarHostState.showSnackbar(
                 message = msg,
-                actionLabel = "Undo",
+                actionLabel = undoActionLabel,
                 duration = SnackbarDuration.Short
             )
             if (result == SnackbarResult.ActionPerformed) {
@@ -133,7 +141,7 @@ fun DashboardScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Manual Log Drink",
+                    contentDescription = stringResource(R.string.dashboard_manual_log_cd),
                     modifier = Modifier.size(30.dp)
                 )
             }
@@ -154,7 +162,7 @@ fun DashboardScreen(
                         .padding(horizontal = 20.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = "Fillmark",
+                        text = stringResource(R.string.app_name),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -215,20 +223,24 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Today's Intake",
+                        text = stringResource(R.string.dashboard_todays_intake),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "${uiState.todayRecords.size} entries",
+                        text = pluralStringResource(
+                            R.plurals.entries_count,
+                            uiState.todayRecords.size,
+                            uiState.todayRecords.size
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // Section 4: Today's Logs Items or Delightful Empty State
+            // Section 4: Today's Logs Items or Empty State
             if (uiState.todayRecords.isEmpty()) {
                 item {
                     Column(
@@ -239,10 +251,12 @@ fun DashboardScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         MinimalistGlassIllustration(
-                            modifier = Modifier.padding(bottom = 12.dp)
+                            modifier = Modifier
+                                .padding(bottom = 12.dp)
+                                .clearAndSetSemantics {}
                         )
                         Text(
-                            text = "No drinks logged today yet.",
+                            text = stringResource(R.string.dashboard_empty_today),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -351,9 +365,11 @@ private fun AdjustTodayTargetDialog(
     val ml = VolumeConverter.toInternalMl(parsed, selectedUnit)
     val isValid = ml > 0 && ml <= VolumeConverter.MAX_DAILY_TARGET_ML
     val errorText = when {
-        targetInput.isBlank() || ml <= 0 -> "Enter a goal greater than 0"
-        ml > VolumeConverter.MAX_DAILY_TARGET_ML ->
-            "Max target is ${VolumeConverter.formatVolume(VolumeConverter.MAX_DAILY_TARGET_ML, selectedUnit)}"
+        targetInput.isBlank() || ml <= 0 -> stringResource(R.string.error_target_gt_zero)
+        ml > VolumeConverter.MAX_DAILY_TARGET_ML -> stringResource(
+            R.string.error_max_daily_target,
+            VolumeConverter.formatVolume(VolumeConverter.MAX_DAILY_TARGET_ML, selectedUnit)
+        )
         else -> null
     }
 
@@ -361,7 +377,7 @@ private fun AdjustTodayTargetDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Today's Goal Override",
+                text = stringResource(R.string.dashboard_today_goal_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -369,7 +385,7 @@ private fun AdjustTodayTargetDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Adjust your goal for today only (e.g., workout or hot day). Past and future days keep your default target.",
+                    text = stringResource(R.string.dashboard_today_goal_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -380,7 +396,7 @@ private fun AdjustTodayTargetDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Unit",
+                        text = stringResource(R.string.unit_label),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -398,7 +414,7 @@ private fun AdjustTodayTargetDialog(
                 OutlinedTextField(
                     value = targetInput,
                     onValueChange = { targetInput = VolumeConverter.sanitizeDecimalInput(it) },
-                    label = { Text("Today's Target (${selectedUnit.symbol})") },
+                    label = { Text(stringResource(R.string.dashboard_today_target_input, selectedUnit.symbol)) },
                     suffix = { Text(selectedUnit.symbol) },
                     singleLine = true,
                     isError = errorText != null,
@@ -411,13 +427,13 @@ private fun AdjustTodayTargetDialog(
                     val defaultText = if (defaultTargetMl > 0) {
                         VolumeConverter.formatVolume(defaultTargetMl, selectedUnit)
                     } else {
-                        "No Goal"
+                        stringResource(R.string.dashboard_no_goal)
                     }
                     TextButton(
                         onClick = onResetToDefault,
                         modifier = Modifier.align(Alignment.End)
                     ) {
-                        Text("Reset to Default ($defaultText)")
+                        Text(stringResource(R.string.dashboard_reset_to_default, defaultText))
                     }
                 }
             }
@@ -427,12 +443,12 @@ private fun AdjustTodayTargetDialog(
                 onClick = { if (isValid) onSave(ml) },
                 enabled = isValid
             ) {
-                Text("Save for Today")
+                Text(stringResource(R.string.dashboard_save_for_today))
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -536,11 +552,14 @@ fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
 @Composable
 private fun TodayLogItem(
     record: HydrationRecordEntity,
-    displayUnit: com.fillmark.app.core.DisplayUnit,
+    displayUnit: DisplayUnit,
     hydrationFactorsEnabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -564,7 +583,7 @@ private fun TodayLogItem(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        painter = androidx.compose.ui.res.painterResource(id = com.fillmark.app.core.PresetIcon.getDrawableRes(record.iconKey)),
+                        painter = painterResource(id = PresetIcon.getDrawableRes(record.iconKey)),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
@@ -580,7 +599,7 @@ private fun TodayLogItem(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = TimeUtils.formatTime(record.timestamp),
+                    text = TimeUtils.formatTime(record.timestamp, is24Hour = is24Hour),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -597,7 +616,10 @@ private fun TodayLogItem(
                 )
                 if (hydrationFactorsEnabled && record.hydrationFactor != 1.0) {
                     Text(
-                        text = "Raw: ${VolumeConverter.formatVolume(record.volumeMl, displayUnit)}",
+                        text = stringResource(
+                            R.string.dashboard_raw_volume,
+                            VolumeConverter.formatVolume(record.volumeMl, displayUnit)
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

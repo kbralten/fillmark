@@ -3,6 +3,7 @@ package com.fillmark.app.ui.history
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
@@ -50,13 +51,19 @@ class HistoryViewModel @JvmOverloads constructor(
                 repository.preferencesFlow,
                 currentDateFlow
             ) { records, prefs, _ ->
+                val todayLabel = getApplication<Application>().getString(R.string.today)
+                val yesterdayLabel = getApplication<Application>().getString(R.string.yesterday)
                 val factorsEnabled = prefs.hydrationFactorsEnabled
                 val grouped = records
                     .groupBy { TimeUtils.toIsoDate(it.timestamp) }
                     .map { (dateIso, groupRecords) ->
                         DayGroup(
                             dateIso = dateIso,
-                            friendlyDate = TimeUtils.formatFriendlyDate(dateIso),
+                            friendlyDate = TimeUtils.formatFriendlyDate(
+                                dateString = dateIso,
+                                todayLabel = todayLabel,
+                                yesterdayLabel = yesterdayLabel
+                            ),
                             totalEffectiveVolumeMl = groupRecords.sumOf { it.countedVolumeMl(factorsEnabled) },
                             records = groupRecords.sortedByDescending { it.timestamp }
                         )
@@ -101,7 +108,7 @@ class HistoryViewModel @JvmOverloads constructor(
             _uiState.update {
                 it.copy(
                     recentlyDeletedRecord = record,
-                    snackbarMessage = "Record deleted"
+                    snackbarMessage = getApplication<Application>().getString(R.string.record_deleted)
                 )
             }
         }

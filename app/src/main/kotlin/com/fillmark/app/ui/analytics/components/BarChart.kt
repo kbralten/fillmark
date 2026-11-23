@@ -17,8 +17,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fillmark.app.R
+import com.fillmark.app.core.DisplayUnit
+import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.ui.analytics.ChartBarData
 import com.fillmark.app.ui.theme.FillmarkCyan
 import com.fillmark.app.ui.theme.FillmarkNavy700
@@ -30,10 +36,22 @@ import kotlin.math.roundToInt
 fun BarChart(
     bars: List<ChartBarData>,
     modifier: Modifier = Modifier,
+    displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
     selectedIndex: Int? = null,
     onBarClick: ((Int, ChartBarData) -> Unit)? = null
 ) {
     if (bars.isEmpty()) return
+
+    val selectedBar = selectedIndex?.let { bars.getOrNull(it) }
+    val chartDescription = if (selectedBar != null) {
+        val barLabel = selectedBar.label.ifEmpty {
+            selectedBar.dateIso ?: stringResource(R.string.analytics_period_fallback)
+        }
+        val formattedVolume = VolumeConverter.formatVolume(selectedBar.valueMl, displayUnit)
+        stringResource(R.string.analytics_barchart_selected_a11y, barLabel, formattedVolume)
+    } else {
+        stringResource(R.string.analytics_barchart_a11y, bars.size)
+    }
 
     val trackColor = FillmarkNavy700
     val targetLineColor = Color(0x66A5B9CC)
@@ -50,6 +68,7 @@ fun BarChart(
             .fillMaxWidth()
             .height(205.dp)
             .padding(top = 10.dp, bottom = 4.dp, start = 4.dp, end = 4.dp)
+            .semantics { contentDescription = chartDescription }
             .then(
                 if (onBarClick != null) {
                     Modifier.pointerInput(bars) {
@@ -135,7 +154,6 @@ fun BarChart(
             }
 
             if (hasData) {
-
                 // Accent percentage badge when bars are wide enough to render cleanly
                 if (showBadges) {
                     val pct = if (bar.targetMl > 0) {

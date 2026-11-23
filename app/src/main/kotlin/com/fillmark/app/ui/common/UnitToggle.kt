@@ -8,7 +8,9 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,14 +26,14 @@ fun UnitToggle(
             onClick = { onUnitSelected(DisplayUnit.METRIC_ML) },
             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
             icon = {},
-            label = { Text("ml") }
+            label = { Text(stringResource(R.string.unit_ml_short)) }
         )
         SegmentedButton(
             selected = selectedUnit == DisplayUnit.IMPERIAL_FL_OZ,
             onClick = { onUnitSelected(DisplayUnit.IMPERIAL_FL_OZ) },
             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
             icon = {},
-            label = { Text("oz") }
+            label = { Text(stringResource(R.string.unit_oz_short)) }
         )
     }
 }

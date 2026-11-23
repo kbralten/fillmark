@@ -53,10 +53,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.fillmark.app.R
+import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.domain.DailyGraphMode
@@ -66,8 +70,8 @@ import com.fillmark.app.ui.analytics.components.BarChart
 import com.fillmark.app.ui.analytics.components.DailyLineChart
 import com.fillmark.app.ui.theme.FillmarkCyan
 import com.fillmark.app.ui.theme.FillmarkNavy700
-import com.fillmark.app.ui.theme.FillmarkNavy900
 import com.fillmark.app.ui.theme.FillmarkNavy800
+import com.fillmark.app.ui.theme.FillmarkNavy900
 import com.fillmark.app.ui.theme.FillmarkSlateMuted
 import kotlin.math.roundToInt
 
@@ -80,6 +84,8 @@ fun AnalyticsScreen(
     var selectedBarIndex by remember(uiState.selectedInterval, uiState.periodOffset, uiState.bars) {
         mutableStateOf<Int?>(null)
     }
+    val todayLabel = stringResource(R.string.today)
+    val yesterdayLabel = stringResource(R.string.yesterday)
 
     LifecycleResumeEffect(Unit) {
         viewModel.refreshCurrentDate()
@@ -94,7 +100,7 @@ fun AnalyticsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Drink Analytics",
+            text = stringResource(R.string.analytics_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onBackground
@@ -169,7 +175,7 @@ fun AnalyticsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Intake Breakdown",
+                        text = stringResource(R.string.analytics_intake_breakdown),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
@@ -182,7 +188,7 @@ fun AnalyticsScreen(
                         )
                     } else {
                         Text(
-                            text = "-- Target Line",
+                            text = stringResource(R.string.analytics_target_line),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF8CA3BA)
                         )
@@ -230,7 +236,7 @@ fun AnalyticsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No drink history recorded yet",
+                                text = stringResource(R.string.analytics_empty_history),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color(0xFF8CA3BA)
                             )
@@ -238,6 +244,7 @@ fun AnalyticsScreen(
                     } else {
                         BarChart(
                             bars = state.bars,
+                            displayUnit = uiState.displayUnit,
                             selectedIndex = selectedBarIndex,
                             onBarClick = { idx, _ ->
                                 selectedBarIndex = if (selectedBarIndex == idx) null else idx
@@ -262,8 +269,13 @@ fun AnalyticsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                val title = inspectedBar.dateIso?.let { TimeUtils.formatFriendlyDate(it) }
-                                    ?: inspectedBar.label.ifEmpty { "Period" }
+                                val title = inspectedBar.dateIso?.let {
+                                    TimeUtils.formatFriendlyDate(
+                                        dateString = it,
+                                        todayLabel = todayLabel,
+                                        yesterdayLabel = yesterdayLabel
+                                    )
+                                } ?: inspectedBar.label.ifEmpty { stringResource(R.string.analytics_period_fallback) }
                                 Text(
                                     text = title,
                                     style = MaterialTheme.typography.labelMedium,
@@ -282,7 +294,11 @@ fun AnalyticsScreen(
                             }
                             if (inspectedBar.dateIso != null) {
                                 TextButton(onClick = { viewModel.inspectDate(inspectedBar.dateIso) }) {
-                                    Text("View Day", color = FillmarkCyan, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = stringResource(R.string.analytics_view_day),
+                                        color = FillmarkCyan,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -298,15 +314,21 @@ fun AnalyticsScreen(
         ) {
             MetricCard(
                 title = if (uiState.selectedInterval == AnalyticsInterval.DAY) {
-                    if (uiState.periodOffset == 0) "Today's Intake" else "Day's Intake"
-                } else "Daily Average",
+                    if (uiState.periodOffset == 0) {
+                        stringResource(R.string.dashboard_todays_intake)
+                    } else {
+                        stringResource(R.string.analytics_day_intake)
+                    }
+                } else {
+                    stringResource(R.string.analytics_daily_average)
+                },
                 value = VolumeConverter.formatVolume(uiState.averageDailyVolumeMl, uiState.displayUnit),
                 icon = Icons.Outlined.CalendarToday,
                 modifier = Modifier.weight(1f)
             )
 
             MetricCard(
-                title = "Total Intake",
+                title = stringResource(R.string.analytics_total_intake),
                 value = VolumeConverter.formatVolume(uiState.totalVolumeMl, uiState.displayUnit),
                 icon = Icons.Outlined.WaterDrop,
                 modifier = Modifier.weight(1f)
@@ -327,20 +349,22 @@ fun AnalyticsScreen(
             } else 0
 
             MetricCard(
-                title = "Goal Hit Rate",
+                title = stringResource(R.string.analytics_goal_hit_rate),
                 value = if (hasTarget) "$successRate%" else "0%",
                 icon = Icons.Outlined.TrackChanges,
-                subtitle = if (hasTarget && uiState.totalDays > 0) "${uiState.daysGoalMet} of ${uiState.totalDays} days" else null,
+                subtitle = if (hasTarget && uiState.totalDays > 0) {
+                    stringResource(R.string.analytics_days_met_subtitle, uiState.daysGoalMet, uiState.totalDays)
+                } else null,
                 modifier = Modifier.weight(1f)
             )
 
-            val streakLabel = if (uiState.currentStreak == 1) "1 day" else "${uiState.currentStreak} days"
-            val bestLabel = if (uiState.bestStreak == 1) "1 day" else "${uiState.bestStreak} days"
+            val streakLabel = pluralStringResource(R.plurals.streak_days, uiState.currentStreak, uiState.currentStreak)
+            val bestLabel = pluralStringResource(R.plurals.streak_days, uiState.bestStreak, uiState.bestStreak)
             MetricCard(
-                title = "Goal Streak",
+                title = stringResource(R.string.analytics_goal_streak),
                 value = streakLabel,
                 icon = Icons.Outlined.LocalFireDepartment,
-                subtitle = "Best: $bestLabel",
+                subtitle = stringResource(R.string.analytics_best_streak, bestLabel),
                 modifier = Modifier.weight(1f)
             )
         }
@@ -359,7 +383,7 @@ fun AnalyticsScreen(
 @Composable
 private fun DrinkBreakdownCard(
     items: List<DrinkTypeBreakdownItem>,
-    displayUnit: com.fillmark.app.core.DisplayUnit,
+    displayUnit: DisplayUnit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -373,7 +397,7 @@ private fun DrinkBreakdownCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Drink Breakdown",
+                text = stringResource(R.string.analytics_drink_breakdown),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -532,7 +556,11 @@ private fun DailyGraphLegend(
                     .background(FillmarkCyan, RoundedCornerShape(1.5.dp))
             )
             Text(
-                text = if (mode == DailyGraphMode.CUMULATIVE) "Intake" else "Rate",
+                text = if (mode == DailyGraphMode.CUMULATIVE) {
+                    stringResource(R.string.analytics_legend_intake)
+                } else {
+                    stringResource(R.string.analytics_legend_rate)
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFFCAD7E2)
             )
@@ -551,7 +579,7 @@ private fun DailyGraphLegend(
                         color = Color(0xFF8CA3BA)
                     )
                     Text(
-                        text = "Target",
+                        text = stringResource(R.string.analytics_legend_target),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF8CA3BA)
                     )
@@ -568,7 +596,7 @@ private fun DailyGraphLegend(
                         color = Color(0xFF38BDF8)
                     )
                     Text(
-                        text = "Target Pace",
+                        text = stringResource(R.string.analytics_legend_target_pace),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF38BDF8)
                     )
@@ -585,7 +613,7 @@ private fun DailyGraphLegend(
                         color = Color(0xFF8CA3BA)
                     )
                     Text(
-                        text = "Target Rate",
+                        text = stringResource(R.string.analytics_legend_target_rate),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF8CA3BA)
                     )
@@ -607,20 +635,18 @@ private fun PeriodNavigationBar(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 2.dp),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(
             onClick = onPrevious,
             enabled = canGoPrevious,
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.NavigateBefore,
-                contentDescription = "Previous period",
+                contentDescription = stringResource(R.string.analytics_prev_period_cd),
                 tint = if (canGoPrevious) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                 modifier = Modifier.size(22.dp)
             )
@@ -640,11 +666,11 @@ private fun PeriodNavigationBar(
             if (showJumpToCurrent) {
                 IconButton(
                     onClick = onJumpToCurrent,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Today,
-                        contentDescription = "Jump to current period",
+                        contentDescription = stringResource(R.string.analytics_jump_current_cd),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -654,11 +680,11 @@ private fun PeriodNavigationBar(
             IconButton(
                 onClick = onNext,
                 enabled = canGoNext,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.NavigateNext,
-                    contentDescription = "Next period",
+                    contentDescription = stringResource(R.string.analytics_next_period_cd),
                     tint = if (canGoNext) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                     modifier = Modifier.size(22.dp)
                 )

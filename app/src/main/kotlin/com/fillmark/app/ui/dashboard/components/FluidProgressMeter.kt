@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -38,9 +39,14 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.domain.PacingResult
@@ -104,15 +110,47 @@ fun FluidProgressMeter(
     val primaryTextColor = MaterialTheme.colorScheme.onBackground
     val mutedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
+    val consumedFormatted = VolumeConverter.formatVolume(effectiveVolumeMl, displayUnit)
+    val percent = if (hasTarget) (progressRatio * 100).roundToInt() else 0
+    val gaugeContentDescription = if (hasTarget) {
+        val targetFormatted = VolumeConverter.formatVolume(targetMl, displayUnit)
+        if (pacingResult != null) {
+            stringResource(
+                R.string.meter_a11y_with_target_and_pace,
+                consumedFormatted,
+                targetFormatted,
+                percent,
+                pacingResult.statusText
+            )
+        } else {
+            stringResource(R.string.meter_a11y_with_target, consumedFormatted, targetFormatted, percent)
+        }
+    } else {
+        stringResource(R.string.meter_a11y_no_target, consumedFormatted)
+    }
+
+    val density = LocalDensity.current
+    val gaugeScale = density.fontScale.coerceIn(1f, 1.18f)
+    val ringSize = 246.dp * gaugeScale
+    val displayStyle = MaterialTheme.typography.displayMedium
+    val numberFontSize = displayStyle.fontSize * (density.fontScale.coerceAtMost(1.3f) / density.fontScale)
+    val subtitleStyle = MaterialTheme.typography.bodyMedium
+    val subtitleFontSize = subtitleStyle.fontSize * (density.fontScale.coerceAtMost(1.35f) / density.fontScale)
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(246.dp),
+            modifier = Modifier.size(ringSize),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp)
+                    .semantics { contentDescription = gaugeContentDescription }
+            ) {
                 val strokeWidth = 14.dp.toPx()
                 val radius = (size.minDimension - strokeWidth) / 2
                 val centerOffset = Offset(size.width / 2, size.height / 2)
@@ -121,7 +159,7 @@ fun FluidProgressMeter(
                 // Subtle water wave / gradient graphic behind the metric texts
                 val clipCircle = Path().apply {
                     addOval(
-                        androidx.compose.ui.geometry.Rect(
+                        Rect(
                             centerOffset.x - innerRadius,
                             centerOffset.y - innerRadius,
                             centerOffset.x + innerRadius,
@@ -131,8 +169,6 @@ fun FluidProgressMeter(
                 }
 
                 clipPath(clipCircle) {
-                    val waveWidth = innerRadius * 2
-                    val waveHeight = innerRadius * 2
                     val waveBaseY = centerOffset.y + innerRadius * 0.15f
 
                     // Secondary subtle wave (background)
@@ -242,21 +278,25 @@ fun FluidProgressMeter(
 
             // Central Metric Texts
             Column(
+                modifier = Modifier.padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 if (hasTarget) {
-                    val percent = (progressRatio * 100).roundToInt()
                     Text(
                         text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
-                        style = MaterialTheme.typography.displayMedium,
+                        style = displayStyle,
+                        fontSize = numberFontSize,
                         fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        softWrap = false,
                         color = primaryTextColor
                     )
                     Text(
                         text = displayUnit.symbol,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
                         color = primaryTextColor.copy(alpha = 0.85f)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
@@ -266,21 +306,28 @@ fun FluidProgressMeter(
                         modifier = if (onTargetClick != null) {
                             Modifier
                                 .clickable(onClick = onTargetClick)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
                         } else {
                             Modifier
                         }
                     ) {
                         Text(
-                            text = "$percent% of ${VolumeConverter.formatVolume(targetMl, displayUnit)}",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = stringResource(
+                                R.string.meter_percent_of_target,
+                                percent,
+                                VolumeConverter.formatVolume(targetMl, displayUnit)
+                            ),
+                            style = subtitleStyle,
+                            fontSize = subtitleFontSize,
                             fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             color = mutedTextColor
                         )
                         if (onTargetClick != null) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
-                                contentDescription = "Adjust today's target",
+                                contentDescription = stringResource(R.string.meter_adjust_target_cd),
                                 tint = mutedTextColor,
                                 modifier = Modifier.size(13.dp)
                             )
@@ -288,7 +335,7 @@ fun FluidProgressMeter(
                     }
                     if (isTargetOverridden) {
                         Text(
-                            text = "Today only",
+                            text = stringResource(R.string.meter_today_only),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
@@ -297,14 +344,18 @@ fun FluidProgressMeter(
                 } else {
                     Text(
                         text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
-                        style = MaterialTheme.typography.displayMedium,
+                        style = displayStyle,
+                        fontSize = numberFontSize,
                         fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        softWrap = false,
                         color = primaryTextColor
                     )
                     Text(
                         text = displayUnit.symbol,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
                         color = primaryTextColor
                     )
                     if (onTargetClick != null) {
@@ -314,16 +365,16 @@ fun FluidProgressMeter(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier
                                 .clickable(onClick = onTargetClick)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = "Set today's goal",
+                                text = stringResource(R.string.meter_set_today_goal),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Icon(
                                 imageVector = Icons.Default.Edit,
-                                contentDescription = "Set today's goal",
+                                contentDescription = stringResource(R.string.meter_set_today_goal),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(12.dp)
                             )
@@ -372,13 +423,13 @@ fun FluidProgressMeter(
                 ) {
                     Icon(
                         imageVector = iconVector,
-                        contentDescription = "Pace Status",
+                        contentDescription = stringResource(R.string.meter_pace_status_cd),
                         tint = iconColor,
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Pace: ${pacingResult.statusText}",
+                        text = stringResource(R.string.meter_pace_label, pacingResult.statusText),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = textColor

@@ -3,6 +3,7 @@ package com.fillmark.app.ui.dashboard
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.DrinkType
 import com.fillmark.app.core.PresetIcon
@@ -99,9 +100,10 @@ class DashboardViewModel @JvmOverloads constructor(
                     null
                 }
 
+                val todayLabel = getApplication<Application>().getString(R.string.today)
                 _uiState.update { current ->
                     current.copy(
-                        dateHeader = TimeUtils.formatCurrentDateHeader(now.zone),
+                        dateHeader = TimeUtils.formatCurrentDateHeader(now.zone, todayLabel = todayLabel),
                         effectiveVolumeMl = summary.effectiveVolumeMl,
                         targetMl = summary.targetMl,
                         defaultTargetMl = summary.defaultTargetMl,
@@ -125,7 +127,11 @@ class DashboardViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             val record = repository.logPreset(preset)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
-            showUndoSnackbar(loggedRecord = record, deletedRecord = null, message = "Added ${preset.label}")
+            showUndoSnackbar(
+                loggedRecord = record,
+                deletedRecord = null,
+                message = getApplication<Application>().getString(R.string.dashboard_added_preset, preset.label)
+            )
         }
     }
 
@@ -134,7 +140,11 @@ class DashboardViewModel @JvmOverloads constructor(
             val preset = repository.getPresets().firstOrNull { it.id == presetId } ?: return@launch
             val record = repository.logPreset(preset)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
-            showUndoSnackbar(loggedRecord = record, deletedRecord = null, message = "Added ${preset.label}")
+            showUndoSnackbar(
+                loggedRecord = record,
+                deletedRecord = null,
+                message = getApplication<Application>().getString(R.string.dashboard_added_preset, preset.label)
+            )
         }
     }
 
@@ -154,7 +164,10 @@ class DashboardViewModel @JvmOverloads constructor(
             showUndoSnackbar(
                 loggedRecord = record,
                 deletedRecord = null,
-                message = "Logged ${drinkType.lowercase().replaceFirstChar { it.uppercase() }}"
+                message = getApplication<Application>().getString(
+                    R.string.dashboard_logged_drink,
+                    drinkType.lowercase().replaceFirstChar { it.uppercase() }
+                )
             )
         }
     }
@@ -206,7 +219,11 @@ class DashboardViewModel @JvmOverloads constructor(
             repository.deleteRecordById(record.id)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
             _uiState.update { it.copy(editingRecord = null) }
-            showUndoSnackbar(loggedRecord = null, deletedRecord = record, message = "Record deleted")
+            showUndoSnackbar(
+                loggedRecord = null,
+                deletedRecord = record,
+                message = getApplication<Application>().getString(R.string.record_deleted)
+            )
         }
     }
 

@@ -1,92 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="280dp"
-    android:height="150dp"
+    android:width="200dp"
+    android:height="108dp"
     android:viewportWidth="280"
     android:viewportHeight="150">
     <!-- Background Card -->
     <path
-        android:fillColor="#1B262C"
+        android:fillColor="#182432"
         android:pathData="M16,0 L264,0 A16,16 0 0,1 280,16 L280,134 A16,16 0 0,1 264,150 L16,150 A16,16 0 0,1 0,134 L0,16 A16,16 0 0,1 16,0 Z" />
 
-    <!-- Top Progress Section -->
-    <path
-        android:fillColor="#87CFF9"
-        android:pathData="M16,16 L60,16 L60,24 L16,24 Z" />
+    <!-- Top Progress Header -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M236,14 L264,14 L264,26 L236,26 Z" />
-
-    <!-- Horizontal Progress Bar -->
-    <path
-        android:fillColor="#2A3B47"
-        android:pathData="M16,36 L264,36 A4,4 0 0,1 268,40 L268,40 A4,4 0 0,1 264,44 L16,44 A4,4 0 0,1 12,40 L12,40 A4,4 0 0,1 16,36 Z" />
-    <path
-        android:fillColor="#0288D1"
-        android:pathData="M16,36 L160,36 A4,4 0 0,1 164,40 L164,40 A4,4 0 0,1 160,44 L16,44 A4,4 0 0,1 12,40 L12,40 A4,4 0 0,1 16,36 Z" />
-
-    <!-- Volume & Status -->
-    <path
-        android:fillColor="#90A4AE"
-        android:pathData="M16,54 L90,54 L90,60 L16,60 Z" />
-    <path
-        android:fillColor="#4DD0E1"
-        android:pathData="M180,54 L264,54 L264,60 L180,60 Z" />
-
-    <!-- Divider Line -->
-    <path
-        android:fillColor="#233540"
-        android:pathData="M16,68 L264,68 L264,69 L16,69 Z" />
-
-    <!-- Bottom Presets Section -->
-    <!-- Preset 1 -->
-    <path
-        android:fillColor="#233540"
-        android:pathData="M16,78 L72,78 A6,6 0 0,1 78,84 L78,136 A6,6 0 0,1 72,142 L16,142 A6,6 0 0,1 10,136 L10,84 A6,6 0 0,1 16,78 Z" />
-    <path
-        android:fillColor="#4DD0E1"
-        android:pathData="M40,86 L48,86 L47,96 L41,96 Z" />
+        android:pathData="M14,14 L62,14 A2,2 0 0,1 64,16 L64,20 A2,2 0 0,1 62,22 L14,22 A2,2 0 0,1 12,20 L12,16 A2,2 0 0,1 14,14 Z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M24,106 L64,106 L64,112 L24,112 Z" />
-    <path
-        android:fillColor="#87CFF9"
-        android:pathData="M26,120 L62,120 L62,126 L26,126 Z" />
+        android:pathData="M240,12 L266,12 A2,2 0 0,1 268,14 L268,22 A2,2 0 0,1 266,24 L240,24 A2,2 0 0,1 238,22 L238,14 A2,2 0 0,1 240,12 Z" />
 
-    <!-- Preset 2 -->
+    <!-- Progress Bar Track & Luminous Fill -->
     <path
-        android:fillColor="#233540"
-        android:pathData="M84,78 L140,78 A6,6 0 0,1 146,84 L146,136 A6,6 0 0,1 140,142 L84,142 A6,6 0 0,1 78,136 L78,84 A6,6 0 0,1 84,78 Z" />
+        android:fillColor="#23374A"
+        android:pathData="M18,32 L262,32 A6,6 0 0,1 268,38 L268,38 A6,6 0 0,1 262,44 L18,44 A6,6 0 0,1 12,38 L12,38 A6,6 0 0,1 18,32 Z" />
+    <path
+        android:fillColor="#20D2DE"
+        android:pathData="M18,32 L182,32 A6,6 0 0,1 188,38 L188,38 A6,6 0 0,1 182,44 L18,44 A6,6 0 0,1 12,38 L12,38 A6,6 0 0,1 18,32 Z" />
+
+    <!-- Volume & On-Track Status Pill -->
+    <path
+        android:fillColor="#9EAFBF"
+        android:pathData="M14,52 L96,52 A2,2 0 0,1 98,54 L98,56 A2,2 0 0,1 96,58 L14,58 A2,2 0 0,1 12,56 L12,54 A2,2 0 0,1 14,52 Z" />
+    <path
+        android:fillColor="#143B38"
+        android:pathData="M196,50 L262,50 A6,6 0 0,1 268,56 L268,56 A6,6 0 0,1 262,62 L196,62 A6,6 0 0,1 190,56 L190,56 A6,6 0 0,1 196,50 Z" />
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M198,53 A3,3 0 1,0 198,59 A3,3 0 1,0 198,53 Z" />
+    <path
+        android:fillColor="#7DE6C0"
+        android:pathData="M206,54 L260,54 L260,58 L206,58 Z" />
+
+    <!-- Bottom 5-Preset Row -->
+    <!-- Tile 1 (Cyan) -->
+    <path
+        android:fillColor="#1A3B4C"
+        android:pathData="M18,76 L54,76 A6,6 0 0,1 60,82 L60,132 A6,6 0 0,1 54,138 L18,138 A6,6 0 0,1 12,132 L12,82 A6,6 0 0,1 18,76 Z" />
+    <path
+        android:fillColor="#20D2DE"
+        android:pathData="M31,86 L41,86 L40,98 L32,98 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,106 L50,106 L50,111 L22,111 Z" />
+    <path
+        android:fillColor="#20D2DE"
+        android:pathData="M24,117 L48,117 L48,122 L24,122 Z" />
+
+    <!-- Tile 2 (Blue) -->
+    <path
+        android:fillColor="#1B354E"
+        android:pathData="M70,76 L106,76 A6,6 0 0,1 112,82 L112,132 A6,6 0 0,1 106,138 L70,138 A6,6 0 0,1 64,132 L64,82 A6,6 0 0,1 70,76 Z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M83,84 L93,84 L93,98 L83,98 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M74,106 L102,106 L102,111 L74,111 Z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M76,117 L100,117 L100,122 L76,122 Z" />
+
+    <!-- Tile 3 (Amber) -->
+    <path
+        android:fillColor="#363129"
+        android:pathData="M122,76 L158,76 A6,6 0 0,1 164,82 L164,132 A6,6 0 0,1 158,138 L122,138 A6,6 0 0,1 116,132 L116,82 A6,6 0 0,1 122,76 Z" />
     <path
         android:fillColor="#FFB74D"
-        android:pathData="M108,86 L116,86 L116,96 L108,96 Z" />
+        android:pathData="M135,86 L145,86 L145,98 L135,98 Z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M92,106 L132,106 L132,112 L92,112 Z" />
+        android:pathData="M126,106 L154,106 L154,111 L126,111 Z" />
     <path
-        android:fillColor="#87CFF9"
-        android:pathData="M94,120 L130,120 L130,126 L94,126 Z" />
+        android:fillColor="#FFB74D"
+        android:pathData="M128,117 L152,117 L152,122 L128,122 Z" />
 
-    <!-- Preset 3 -->
+    <!-- Tile 4 (Green) -->
     <path
-        android:fillColor="#233540"
-        android:pathData="M152,78 L208,78 A6,6 0 0,1 214,84 L214,136 A6,6 0 0,1 208,142 L152,142 A6,6 0 0,1 146,136 L146,84 A6,6 0 0,1 152,78 Z" />
+        android:fillColor="#1C3933"
+        android:pathData="M174,76 L210,76 A6,6 0 0,1 216,82 L216,132 A6,6 0 0,1 210,138 L174,138 A6,6 0 0,1 168,132 L168,82 A6,6 0 0,1 174,76 Z" />
     <path
-        android:fillColor="#4DD0E1"
-        android:pathData="M176,84 L184,84 L184,96 L176,96 Z" />
+        android:fillColor="#4ADE80"
+        android:pathData="M187,85 L197,85 L196,98 L188,98 Z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M160,106 L200,106 L200,112 L160,112 Z" />
+        android:pathData="M178,106 L206,106 L206,111 L178,111 Z" />
     <path
-        android:fillColor="#87CFF9"
-        android:pathData="M162,120 L198,120 L198,126 L162,126 Z" />
+        android:fillColor="#4ADE80"
+        android:pathData="M180,117 L204,117 L204,122 L180,122 Z" />
 
-    <!-- Preset 4 / + Button -->
+    <!-- Tile 5 (Purple) -->
     <path
-        android:fillColor="#005C7D"
-        android:pathData="M220,78 L268,78 A6,6 0 0,1 274,84 L274,136 A6,6 0 0,1 268,142 L220,142 A6,6 0 0,1 214,136 L214,84 A6,6 0 0,1 220,78 Z" />
+        android:fillColor="#2D2844"
+        android:pathData="M226,76 L262,76 A6,6 0 0,1 268,82 L268,132 A6,6 0 0,1 262,138 L226,138 A6,6 0 0,1 220,132 L220,82 A6,6 0 0,1 226,76 Z" />
+    <path
+        android:fillColor="#C084FC"
+        android:pathData="M239,85 L249,85 L249,98 L239,98 Z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M241,102 L247,102 L247,118 L241,118 Z M233,107 L255,107 L255,113 L233,113 Z" />
+        android:pathData="M230,106 L258,106 L258,111 L230,111 Z" />
+    <path
+        android:fillColor="#C084FC"
+        android:pathData="M232,117 L256,117 L256,122 L232,122 Z" />
 </vector>
-

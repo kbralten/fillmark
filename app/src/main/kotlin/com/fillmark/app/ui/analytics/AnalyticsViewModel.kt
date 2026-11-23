@@ -145,14 +145,15 @@ class AnalyticsViewModel @JvmOverloads constructor(
         offset: Int,
         today: LocalDate
     ): String {
-        val monthDayFormat = DateTimeFormatter.ofPattern("MMM d", Locale.US)
+        val locale = Locale.getDefault()
+        val monthDayFormat = DateTimeFormatter.ofPattern("MMM d", locale)
         return when (interval) {
             AnalyticsInterval.DAY -> {
                 val date = today.minusDays(offset.toLong())
                 when (offset) {
                     0 -> "Today (${date.format(monthDayFormat)})"
                     1 -> "Yesterday (${date.format(monthDayFormat)})"
-                    else -> date.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US))
+                    else -> date.format(DateTimeFormatter.ofPattern("EEE, MMM d", locale))
                 }
             }
             AnalyticsInterval.WEEK -> {
@@ -175,7 +176,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
             AnalyticsInterval.THREE_MONTHS -> {
                 val end = today.minusDays((offset * 12 * 7).toLong())
                 val start = end.minusDays((12 * 7 - 1).toLong())
-                val yearFormat = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+                val yearFormat = DateTimeFormatter.ofPattern("MMM d, yyyy", locale)
                 when (offset) {
                     0 -> "Past 12 Weeks (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
                     else -> "${start.format(yearFormat)} – ${end.format(yearFormat)}"
@@ -184,7 +185,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
             AnalyticsInterval.YEAR -> {
                 val end = today.minusDays((offset * 52 * 7).toLong())
                 val start = end.minusDays((52 * 7 - 1).toLong())
-                val yearMonthFormat = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
+                val yearMonthFormat = DateTimeFormatter.ofPattern("MMM yyyy", locale)
                 when (offset) {
                     0 -> "Past 52 Weeks (${start.format(yearMonthFormat)} – ${end.format(yearMonthFormat)})"
                     else -> "${start.format(yearMonthFormat)} – ${end.format(yearMonthFormat)}"
@@ -263,7 +264,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
                     val dayTarget = allTargetsMap[dateIso] ?: defaultTargetMl
 
                     ChartBarData(
-                        label = date.format(DateTimeFormatter.ofPattern("EEE", Locale.US)),
+                        label = date.format(DateTimeFormatter.ofPattern("EEE", Locale.getDefault())),
                         valueMl = effective,
                         targetMl = dayTarget,
                         isCurrent = (offset == 0 && daysAgo == 0),
@@ -303,7 +304,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
                     val end = TimeUtils.endOfDayMillis(date, zoneId)
                     val dayRecords = allRecords.filter { it.timestamp in start..end }
                     val effective = dayRecords.sumOf { it.countedVolumeMl(factorsEnabled) }
-                    val label = if (daysAgo % 5 == 0) date.format(DateTimeFormatter.ofPattern("d", Locale.US)) else ""
+                    val label = if (daysAgo % 5 == 0) date.format(DateTimeFormatter.ofPattern("d", Locale.getDefault())) else ""
                     val dayTarget = allTargetsMap[dateIso] ?: defaultTargetMl
 
                     ChartBarData(
@@ -425,7 +426,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
 
                     val showLabel = (idx % labelStride == 0) || ym == endYm
                     ChartBarData(
-                        label = if (showLabel) ym.format(DateTimeFormatter.ofPattern("MMM", Locale.US)) else "",
+                        label = if (showLabel) ym.format(DateTimeFormatter.ofPattern("MMM", Locale.getDefault())) else "",
                         valueMl = monthTotal / daysInSlice,
                         targetMl = targetSum / daysInSlice,
                         isCurrent = (ym == endYm)
@@ -518,7 +519,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
 
                 totalVolumeMl += weekVolume
                 ChartBarData(
-                    label = if (weeksAgo % 4 == 0) weekStart.format(DateTimeFormatter.ofPattern("MMM", Locale.US)) else "",
+                    label = if (weeksAgo % 4 == 0) weekStart.format(DateTimeFormatter.ofPattern("MMM", Locale.getDefault())) else "",
                     valueMl = weekVolume / 7.0,
                     targetMl = weekTargetSum / 7.0,
                     isCurrent = (offset == 0 && weeksAgo == 0)

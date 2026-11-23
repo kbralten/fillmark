@@ -1,5 +1,6 @@
 package com.fillmark.app.ui.common
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,24 +40,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.fillmark.app.R
 import com.fillmark.app.core.TimeUtils
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateTimePickerDialog(
     initialTimestampMillis: Long,
-    title: String = "Override Date & Time",
+    title: String? = null,
     disclaimerText: String? = null,
-    confirmButtonText: String = "Apply",
+    confirmButtonText: String? = null,
     onDismiss: () -> Unit,
     onConfirm: (Long) -> Unit
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
+    val resolvedTitle = title ?: stringResource(R.string.datetime_override_title)
+    val resolvedConfirmText = confirmButtonText ?: stringResource(R.string.action_apply)
+    val todayLabel = stringResource(R.string.today)
+    val yesterdayLabel = stringResource(R.string.yesterday)
+
     val initialDate = remember(initialTimestampMillis) { TimeUtils.toLocalDate(initialTimestampMillis) }
     val initialTime = remember(initialTimestampMillis) { TimeUtils.toLocalTime(initialTimestampMillis) }
 
@@ -76,7 +87,7 @@ fun DateTimePickerDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = title,
+                text = resolvedTitle,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -115,7 +126,7 @@ fun DateTimePickerDialog(
                 }
 
                 Text(
-                    text = "Select when this intake occurred:",
+                    text = stringResource(R.string.datetime_select_prompt),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -146,13 +157,16 @@ fun DateTimePickerDialog(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Date",
+                                    text = stringResource(R.string.datetime_date_label),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = TimeUtils.formatFriendlyDate(selectedDate.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)) +
-                                            " (${TimeUtils.formatFullDate(selectedDate)})",
+                                    text = TimeUtils.formatFriendlyDate(
+                                        selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                                        todayLabel = todayLabel,
+                                        yesterdayLabel = yesterdayLabel
+                                    ) + " (${TimeUtils.formatFullDate(selectedDate)})",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -160,7 +174,7 @@ fun DateTimePickerDialog(
                             }
                         }
                         Text(
-                            text = "Edit",
+                            text = stringResource(R.string.action_edit),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -194,12 +208,12 @@ fun DateTimePickerDialog(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Time",
+                                    text = stringResource(R.string.datetime_time_label),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = TimeUtils.formatTime(selectedTime),
+                                    text = TimeUtils.formatTime(selectedTime, is24Hour = is24Hour),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -207,7 +221,7 @@ fun DateTimePickerDialog(
                             }
                         }
                         Text(
-                            text = "Edit",
+                            text = stringResource(R.string.action_edit),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -217,7 +231,7 @@ fun DateTimePickerDialog(
 
                 if (isFuture) {
                     Text(
-                        text = "Intake time cannot be in the future.",
+                        text = stringResource(R.string.datetime_future_error),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Medium
@@ -233,12 +247,12 @@ fun DateTimePickerDialog(
                 },
                 enabled = !isFuture
             ) {
-                Text(confirmButtonText)
+                Text(resolvedConfirmText)
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -269,12 +283,12 @@ fun DateTimePickerDialog(
                         isDatePickerOpen = false
                     }
                 ) {
-                    Text("OK")
+                    Text(stringResource(R.string.action_ok))
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { isDatePickerOpen = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         ) {
@@ -286,14 +300,14 @@ fun DateTimePickerDialog(
         val timePickerState = rememberTimePickerState(
             initialHour = selectedTime.hour,
             initialMinute = selectedTime.minute,
-            is24Hour = false
+            is24Hour = is24Hour
         )
 
         AlertDialog(
             onDismissRequest = { isTimePickerOpen = false },
             title = {
                 Text(
-                    text = "Select Time",
+                    text = stringResource(R.string.datetime_select_time),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -313,15 +327,14 @@ fun DateTimePickerDialog(
                         isTimePickerOpen = false
                     }
                 ) {
-                    Text("OK")
+                    Text(stringResource(R.string.action_ok))
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { isTimePickerOpen = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
     }
 }
-

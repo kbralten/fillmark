@@ -1,5 +1,6 @@
 package com.fillmark.app.ui.analytics.components
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,8 +25,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fillmark.app.R
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.domain.ChartPoint
 import com.fillmark.app.domain.DailyGraphMode
@@ -40,21 +46,41 @@ fun DailyLineChart(
     data: DailyLineChartData,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
     var selectedPoint by remember(data) { mutableStateOf<ChartPoint?>(null) }
+
+    val chartDescription = if (!data.hasEntries) {
+        stringResource(R.string.analytics_linechart_empty_a11y)
+    } else {
+        val totalText = VolumeConverter.formatVolume(data.totalIntakeMl, data.displayUnit)
+        if (data.hasTarget) {
+            val targetText = VolumeConverter.formatVolume(data.targetVolumeMl, data.displayUnit)
+            stringResource(R.string.analytics_linechart_with_target_a11y, data.mode.label, totalText, targetText)
+        } else {
+            stringResource(R.string.analytics_linechart_a11y, data.mode.label, totalText)
+        }
+    }
+
+    val targetPrefixText = stringResource(R.string.analytics_legend_target)
+    val emptyChartText = if (data.isToday) {
+        stringResource(R.string.analytics_empty_today)
+    } else {
+        stringResource(R.string.analytics_empty_day)
+    }
 
     val trackColor = FillmarkNavy700
     val targetLineColor = Color(0x80A5B9CC)
     val paceLineColor = Color(0x9938BDF8)
     val labelColorInt = Color(0xFF8094A8).toArgb()
     val navy900Int = FillmarkNavy900.toArgb()
-    val whiteInt = android.graphics.Color.WHITE
-    val cyanInt = FillmarkCyan.toArgb()
 
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(210.dp)
             .padding(top = 10.dp, bottom = 4.dp, start = 4.dp, end = 4.dp)
+            .semantics { contentDescription = chartDescription }
             .pointerInput(data) {
                 detectTapGestures(
                     onTap = { offset ->
@@ -109,14 +135,24 @@ fun DailyLineChart(
             strokeWidth = 1.dp.toPx()
         )
 
-        // 2. Bottom 24-hour time labels
-        val timeLabels = listOf(
-            0f to "12a",
-            6f to "6a",
-            12f to "12p",
-            18f to "6p",
-            24f to "12a"
-        )
+        // 2. Bottom 24-hour / 12-hour time labels
+        val timeLabels = if (is24Hour) {
+            listOf(
+                0f to "00:00",
+                6f to "06:00",
+                12f to "12:00",
+                18f to "18:00",
+                24f to "24:00"
+            )
+        } else {
+            listOf(
+                0f to "12a",
+                6f to "6a",
+                12f to "12p",
+                18f to "6p",
+                24f to "12a"
+            )
+        }
         val labelPaint = android.graphics.Paint().apply {
             color = labelColorInt
             textSize = 10.5.sp.toPx()
@@ -158,7 +194,7 @@ fun DailyLineChart(
             // Horizontal target label
             val formattedTarget = VolumeConverter.formatVolume(data.targetVolumeMl, data.displayUnit)
             drawContext.canvas.nativeCanvas.drawText(
-                "Target $formattedTarget",
+                "$targetPrefixText $formattedTarget",
                 plotRight - 4.dp.toPx(),
                 (targetY - 4.dp.toPx()).coerceAtLeast(plotTop + 10.dp.toPx()),
                 refLineTextPaint
@@ -197,7 +233,7 @@ fun DailyLineChart(
 
             val formattedRate = "${VolumeConverter.formatVolume(data.targetRatePerHour, data.displayUnit)}/h"
             drawContext.canvas.nativeCanvas.drawText(
-                "Target $formattedRate",
+                "$targetPrefixText $formattedRate",
                 plotRight - 4.dp.toPx(),
                 (rateY - 4.dp.toPx()).coerceAtLeast(plotTop + 10.dp.toPx()),
                 refLineTextPaint
@@ -289,7 +325,7 @@ fun DailyLineChart(
                 isAntiAlias = true
             }
             drawContext.canvas.nativeCanvas.drawText(
-                if (data.isToday) "No drink entries recorded yet today" else "No drink entries recorded for this day",
+                emptyChartText,
                 (plotLeft + plotRight) / 2f,
                 (plotTop + plotBottom) / 2f,
                 emptyPaint
@@ -343,4 +379,3 @@ fun DailyLineChart(
         }
     }
 }
-
