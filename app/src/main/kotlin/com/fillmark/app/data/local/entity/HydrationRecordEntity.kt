@@ -34,5 +34,8 @@ data class HydrationRecordEntity(
 ) {
     val effectiveVolumeMl: Double
         get() = volumeMl * hydrationFactor
+
+    fun countedVolumeMl(factorsEnabled: Boolean): Double =
+        if (factorsEnabled) effectiveVolumeMl else volumeMl
 }
 

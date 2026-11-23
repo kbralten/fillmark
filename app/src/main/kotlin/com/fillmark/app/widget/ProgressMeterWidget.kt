@@ -103,7 +103,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
                 280
             }
 
-            val effectiveTotalMl = todayRecords.sumOf { it.effectiveVolumeMl }
+            val effectiveTotalMl = todayRecords.sumOf { it.countedVolumeMl(prefs.hydrationFactorsEnabled) }
             val targetMl = targetEntity?.targetMl ?: prefs.defaultDailyTargetMl
             val hasTarget = targetMl > 0
             val rawRatio = if (hasTarget) (effectiveTotalMl / targetMl).toFloat() else 0f

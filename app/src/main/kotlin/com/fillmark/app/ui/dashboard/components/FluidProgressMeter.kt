@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -77,7 +79,9 @@ fun FluidProgressMeter(
     targetMl: Double,
     displayUnit: DisplayUnit,
     pacingResult: PacingResult?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isTargetOverridden: Boolean = false,
+    onTargetClick: (() -> Unit)? = null
 ) {
     val hasTarget = targetMl > 0
     val progressRatio = if (hasTarget) (effectiveVolumeMl / targetMl).toFloat() else 0f
@@ -256,12 +260,40 @@ fun FluidProgressMeter(
                         color = primaryTextColor.copy(alpha = 0.85f)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "$percent% of ${VolumeConverter.formatVolume(targetMl, displayUnit)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Normal,
-                        color = mutedTextColor
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = if (onTargetClick != null) {
+                            Modifier
+                                .clickable(onClick = onTargetClick)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        } else {
+                            Modifier
+                        }
+                    ) {
+                        Text(
+                            text = "$percent% of ${VolumeConverter.formatVolume(targetMl, displayUnit)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Normal,
+                            color = mutedTextColor
+                        )
+                        if (onTargetClick != null) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Adjust today's target",
+                                tint = mutedTextColor,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                    }
+                    if (isTargetOverridden) {
+                        Text(
+                            text = "Today only",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 } else {
                     Text(
                         text = VolumeConverter.formatNumberOnly(effectiveVolumeMl, displayUnit),
@@ -275,6 +307,28 @@ fun FluidProgressMeter(
                         fontWeight = FontWeight.Bold,
                         color = primaryTextColor
                     )
+                    if (onTargetClick != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .clickable(onClick = onTargetClick)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "Set today's goal",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Set today's goal",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

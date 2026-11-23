@@ -25,7 +25,10 @@ data class DayHydrationSummary(
     val dateIso: String,
     val effectiveVolumeMl: Double,
     val targetMl: Double,
-    val records: List<HydrationRecordEntity>
+    val records: List<HydrationRecordEntity>,
+    val isTargetOverridden: Boolean = false,
+    val defaultTargetMl: Double = 2500.0,
+    val hydrationFactorsEnabled: Boolean = true
 )
 
 class HydrationRepository(
@@ -79,13 +82,17 @@ class HydrationRepository(
         val prefsFlow = preferencesRepository.preferencesFlow
 
         return combine(recordsFlow, targetFlow, prefsFlow) { records, targetEntity, prefs ->
-            val effectiveTotal = records.sumOf { it.effectiveVolumeMl }
+            val effectiveTotal = records.sumOf { it.countedVolumeMl(prefs.hydrationFactorsEnabled) }
             val activeTarget = targetEntity?.targetMl ?: prefs.defaultDailyTargetMl
+            val isOverridden = targetEntity != null && targetEntity.targetMl != prefs.defaultDailyTargetMl
             DayHydrationSummary(
                 dateIso = dateIso,
                 effectiveVolumeMl = effectiveTotal,
                 targetMl = activeTarget,
-                records = records
+                records = records,
+                isTargetOverridden = isOverridden,
+                defaultTargetMl = prefs.defaultDailyTargetMl,
+                hydrationFactorsEnabled = prefs.hydrationFactorsEnabled
             )
         }
     }
@@ -160,6 +167,20 @@ class HydrationRepository(
 
     suspend fun setTargetForDate(dateIso: String, targetMl: Double) {
         targetDao.upsertTarget(DailyTargetEntity(dateString = dateIso, targetMl = targetMl))
+    }
+
+    suspend fun clearTargetOverrideForDate(dateIso: String) {
+        targetDao.deleteTargetForDate(dateIso)
+    }
+
+    suspend fun hasAnyRecords(): Boolean = hydrationDao.getEarliestRecordTimestamp() != null
+
+    suspend fun clearAllData() {
+        hydrationDao.deleteAllRecords()
+        targetDao.deleteAllTargets()
+        presetDao.deleteAllPresets()
+        presetDao.insertPresets(FillmarkDatabase.DEFAULT_PRESETS)
+        preferencesRepository.resetPreferencesKeepOnboarding()
     }
 
     /**

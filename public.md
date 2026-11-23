@@ -66,7 +66,6 @@ Overall, Fillmark has a clean Kotlin/Compose/Room/Glance foundation and a solid 
 
 | Capability | Current State | Why Users Expect It |
 |---|---|---|
-| **Hydration Reminders & Notifications** | Completely absent (`POST_NOTIFICATIONS` not declared) | Core reason many users install a drink tracker. Smart pacing-aware reminders ("only notify if behind pace during waking hours") with quick-log notification actions would be a standout differentiator matching Fillmark's pacing model. |
 | **First-Run Onboarding** | Drops directly into `0 ml / 2500 ml` Metric, `7am–11pm` | A brief 2–3 screen setup (unit preference defaulted by locale, daily goal with optional guidance, wake/sleep schedule, optional reminders & Health Connect) makes the app immediately relevant. |
 | **Local Backup / Export / Restore (JSON & CSV)** | Absent | Critical for a local-first, no-account app. Users need a way to transfer history to a new phone or export health logs, plus a "Reset / Clear Data" option in Settings. |
 | **Theme Control & True Dynamic Color** | Hardcoded to follow system (broken in dark mode); `dynamicColor = false` | Users expect Light / Dark / System selector in Settings (and README promises Material 3 dynamic styling). |
@@ -119,7 +118,7 @@ Overall, Fillmark has a clean Kotlin/Compose/Room/Glance foundation and a solid 
 
 1. **Phase 1 — Compliance & Release Plumbing:** Bump `targetSdk = 36`, upgrade Health Connect to stable `1.1.0`, add `proguard-rules.pro` + R8 shrinking + release signing/AAB CI, fix the Compose Lint error, fix `allowBackup`/backup rules, secure `WidgetMidnightReceiver`, fix `HealthConnectRationaleActivity` + Privacy Policy URL, regenerate raster/monochrome launcher icons.
 2. **Phase 2 — Core Bug & Quality Sweep:** Fix Dark Mode color tokens across all screens, fix midnight/time reactivity in `DashboardViewModel`, wire up `DailyTargetDao` historical target preservation, fix Settings target input & Imperial bug, fix `BarChart` overlap & `3M`/`Year` goal-hit math, add periodic/foreground Health Connect inbound sync + Undo fix, fix `DatabaseCallback` seeding race, and repair/expand automated tests (including `MainScreenTest` and Room migration tests).
-3. **Phase 3 — Public-Quality Features & Polish:** Add smart pacing-aware Reminders/Notifications, First-Run Onboarding, JSON/CSV Backup & Restore, Settings About/Privacy/Theme section, full `strings.xml` + 24-hour/locale formatting, TalkBack semantics & 48dp touch targets, and `core-splashscreen`.
+3. **Phase 3 — Public-Quality Features & Polish:** Add First-Run Onboarding, JSON/CSV Backup & Restore, Settings About/Privacy/Theme section, full `strings.xml` + 24-hour/locale formatting, TalkBack semantics & 48dp touch targets, and `core-splashscreen`.
 4. **Phase 4 — Store Submission:** Complete Play Console Health Connect & Data Safety declarations, prepare store graphics/screenshots, run Closed Testing + Play Console Pre-launch Report across real devices, then promote to Production.
 
 If you'd like, we can start tackling these phases right away (for example, starting with Phase 1 blockers or fixing Dark Mode and core bugs).

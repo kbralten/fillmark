@@ -1,13 +1,17 @@
 package com.fillmark.app.ui.settings
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fillmark.app.core.DisplayUnit
+import com.fillmark.app.core.ShortcutHelper
 import com.fillmark.app.core.VolumeConverter
+import com.fillmark.app.data.backup.BackupManager
 import com.fillmark.app.data.local.FillmarkDatabase
+import com.fillmark.app.data.local.ThemeMode
 import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.data.repository.HydrationRepository
 import com.fillmark.app.sync.HealthConnectManager
@@ -25,13 +29,18 @@ data class SettingsUiState(
     val wakingHoursStart: String = "07:00",
     val wakingHoursEnd: String = "23:00",
     val wakingPacingEnabled: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val dynamicColorEnabled: Boolean = false,
+    val hydrationFactorsEnabled: Boolean = true,
     val healthConnectSyncEnabled: Boolean = false,
     val healthConnectBidirectional: Boolean = false,
     val healthConnectSdkStatus: Int = HealthConnectClient.SDK_UNAVAILABLE,
     val isHealthConnectAvailable: Boolean = false,
     val hasHealthConnectPermissions: Boolean = false,
     val lastHealthConnectSyncMillis: Long = 0L,
-    val isSyncingHealthConnect: Boolean = false
+    val isSyncingHealthConnect: Boolean = false,
+    val isBackupBusy: Boolean = false,
+    val statusMessage: String? = null
 )
 
 class SettingsViewModel @JvmOverloads constructor(
@@ -58,6 +67,9 @@ class SettingsViewModel @JvmOverloads constructor(
                         wakingHoursStart = prefs.wakingHoursStart,
                         wakingHoursEnd = prefs.wakingHoursEnd,
                         wakingPacingEnabled = prefs.wakingPacingEnabled,
+                        themeMode = prefs.themeMode,
+                        dynamicColorEnabled = prefs.dynamicColorEnabled,
+                        hydrationFactorsEnabled = prefs.hydrationFactorsEnabled,
                         healthConnectSyncEnabled = prefs.healthConnectSyncEnabled,
                         healthConnectBidirectional = prefs.healthConnectBidirectional,
                         healthConnectSdkStatus = sdkStatus,
@@ -73,6 +85,26 @@ class SettingsViewModel @JvmOverloads constructor(
     fun setDisplayUnit(unit: DisplayUnit) {
         viewModelScope.launch {
             preferencesRepository.updateDisplayUnit(unit)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            ShortcutHelper.updateShortcuts(getApplication())
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            preferencesRepository.updateThemeMode(mode)
+        }
+    }
+
+    fun setDynamicColorEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateDynamicColorEnabled(enabled)
+        }
+    }
+
+    fun setHydrationFactorsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateHydrationFactorsEnabled(enabled)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
         }
     }
@@ -149,5 +181,55 @@ class SettingsViewModel @JvmOverloads constructor(
                 )
             }
         }
+    }
+
+    fun exportBackupJson(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true) }
+            val message = runCatching {
+                val res = BackupManager.exportBackupToUri(getApplication(), uri)
+                "Exported ${res.recordsCount} logs and ${res.presetsCount} presets"
+            }.getOrElse { "Export failed: ${it.localizedMessage ?: "Unknown error"}" }
+            _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
+        }
+    }
+
+    fun restoreBackupJson(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true) }
+            val message = runCatching {
+                val res = BackupManager.restoreBackupFromUri(getApplication(), uri)
+                "Restored ${res.recordsCount} logs and ${res.presetsCount} presets"
+            }.getOrElse { "Restore failed: ${it.localizedMessage ?: "Invalid backup file"}" }
+            _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
+        }
+    }
+
+    fun exportLogsCsv(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true) }
+            val message = runCatching {
+                val count = BackupManager.exportCsvToUri(getApplication(), uri)
+                "Exported $count drink logs to CSV"
+            }.getOrElse { "CSV export failed: ${it.localizedMessage ?: "Unknown error"}" }
+            _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
+        }
+    }
+
+    fun clearAllData() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true) }
+            val message = runCatching {
+                hydrationRepository.clearAllData()
+                WidgetUpdateHelper.updateAllWidgets(getApplication())
+                ShortcutHelper.updateShortcuts(getApplication())
+                "All local data cleared"
+            }.getOrElse { "Clear failed: ${it.localizedMessage ?: "Unknown error"}" }
+            _uiState.update { it.copy(isBackupBusy = false, statusMessage = message) }
+        }
+    }
+
+    fun clearStatusMessage() {
+        _uiState.update { it.copy(statusMessage = null) }
     }
 }

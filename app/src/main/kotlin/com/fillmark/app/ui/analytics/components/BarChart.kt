@@ -1,6 +1,7 @@
 package com.fillmark.app.ui.analytics.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -12,8 +13,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fillmark.app.ui.analytics.ChartBarData
@@ -26,7 +29,9 @@ import kotlin.math.roundToInt
 @Composable
 fun BarChart(
     bars: List<ChartBarData>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    selectedIndex: Int? = null,
+    onBarClick: ((Int, ChartBarData) -> Unit)? = null
 ) {
     if (bars.isEmpty()) return
 
@@ -45,6 +50,22 @@ fun BarChart(
             .fillMaxWidth()
             .height(205.dp)
             .padding(top = 10.dp, bottom = 4.dp, start = 4.dp, end = 4.dp)
+            .then(
+                if (onBarClick != null) {
+                    Modifier.pointerInput(bars) {
+                        detectTapGestures { offset ->
+                            val chartWidth = size.width.toFloat()
+                            if (chartWidth > 0f && bars.isNotEmpty()) {
+                                val slotWidth = chartWidth / bars.size
+                                val idx = (offset.x / slotWidth).toInt().coerceIn(0, bars.lastIndex)
+                                onBarClick(idx, bars[idx])
+                            }
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
     ) {
         val chartHeight = size.height - 28.dp.toPx()
         val chartWidth = size.width
@@ -101,6 +122,19 @@ fun BarChart(
                     size = Size(barWidth, barHeight),
                     cornerRadius = cornerRadius
                 )
+            }
+
+            if (selectedIndex == index) {
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(left, 0f),
+                    size = Size(barWidth, chartHeight),
+                    cornerRadius = cornerRadius,
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
+            }
+
+            if (hasData) {
 
                 // Accent percentage badge when bars are wide enough to render cleanly
                 if (showBadges) {

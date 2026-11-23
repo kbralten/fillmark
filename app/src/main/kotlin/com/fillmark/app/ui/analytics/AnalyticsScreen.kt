@@ -15,20 +15,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NavigateBefore
 import androidx.compose.material.icons.automirrored.filled.NavigateNext
-import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material.icons.outlined.WaterDrop
@@ -38,10 +38,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,15 +57,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.domain.DailyGraphMode
 import com.fillmark.app.domain.DailyLineChartData
+import com.fillmark.app.domain.DrinkTypeBreakdownItem
 import com.fillmark.app.ui.analytics.components.BarChart
 import com.fillmark.app.ui.analytics.components.DailyLineChart
 import com.fillmark.app.ui.theme.FillmarkCyan
 import com.fillmark.app.ui.theme.FillmarkNavy700
-import com.fillmark.app.ui.theme.FillmarkNavy800
 import com.fillmark.app.ui.theme.FillmarkNavy900
+import com.fillmark.app.ui.theme.FillmarkNavy800
 import com.fillmark.app.ui.theme.FillmarkSlateMuted
 import kotlin.math.roundToInt
 
@@ -70,6 +77,9 @@ fun AnalyticsScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedBarIndex by remember(uiState.selectedInterval, uiState.periodOffset, uiState.bars) {
+        mutableStateOf<Int?>(null)
+    }
 
     LifecycleResumeEffect(Unit) {
         viewModel.refreshCurrentDate()
@@ -83,7 +93,6 @@ fun AnalyticsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Integrated Modern Brand Header
         Text(
             text = "Drink Analytics",
             style = MaterialTheme.typography.headlineMedium,
@@ -91,7 +100,6 @@ fun AnalyticsScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
 
-        // Interval Tabs
         SecondaryTabRow(
             selectedTabIndex = uiState.selectedInterval.ordinal,
             containerColor = Color.Transparent,
@@ -106,7 +114,8 @@ fun AnalyticsScreen(
                     text = {
                         Text(
                             text = interval.label,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -115,9 +124,9 @@ fun AnalyticsScreen(
             }
         }
 
-        // Period Navigation Bar (Previous, Next, and Jump to Current)
         PeriodNavigationBar(
             periodLabel = uiState.periodLabel,
+            canGoPrevious = uiState.canGoPrevious,
             canGoNext = uiState.periodOffset > 0,
             showJumpToCurrent = uiState.periodOffset > 0,
             onPrevious = { viewModel.previousPeriod() },
@@ -133,7 +142,8 @@ fun AnalyticsScreen(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .pointerInput(uiState.selectedInterval, uiState.periodOffset) {
+                .pointerInput(uiState.selectedInterval, uiState.periodOffset, uiState.canGoPrevious) {
+                    if (!uiState.canGoPrevious) return@pointerInput
                     var totalDragX = 0f
                     detectHorizontalDragGestures(
                         onDragStart = { totalDragX = 0f },
@@ -196,7 +206,7 @@ fun AnalyticsScreen(
                         dailyLineChartData = uiState.dailyLineChartData,
                         bars = uiState.bars
                     ),
-                    contentKey = { it.periodOffset },
+                    contentKey = { "${it.interval.name}_${it.periodOffset}" },
                     transitionSpec = {
                         if (targetState.periodOffset > initialState.periodOffset) {
                             (slideInHorizontally { -it } + fadeIn()).togetherWith(
@@ -212,14 +222,76 @@ fun AnalyticsScreen(
                 ) { state ->
                     if (state.interval == AnalyticsInterval.DAY) {
                         DailyLineChart(data = state.dailyLineChartData)
+                    } else if (state.bars.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(205.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No drink history recorded yet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF8CA3BA)
+                            )
+                        }
                     } else {
-                        BarChart(bars = state.bars)
+                        BarChart(
+                            bars = state.bars,
+                            selectedIndex = selectedBarIndex,
+                            onBarClick = { idx, _ ->
+                                selectedBarIndex = if (selectedBarIndex == idx) null else idx
+                            }
+                        )
+                    }
+                }
+
+                val inspectedBar = selectedBarIndex?.let { uiState.bars.getOrNull(it) }
+                if (inspectedBar != null && uiState.selectedInterval != AnalyticsInterval.DAY) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = FillmarkNavy700,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                val title = inspectedBar.dateIso?.let { TimeUtils.formatFriendlyDate(it) }
+                                    ?: inspectedBar.label.ifEmpty { "Period" }
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                val volText = VolumeConverter.formatVolume(inspectedBar.valueMl, uiState.displayUnit)
+                                val targetText = if (inspectedBar.targetMl > 0) {
+                                    " / ${VolumeConverter.formatVolume(inspectedBar.targetMl, uiState.displayUnit)}"
+                                } else ""
+                                Text(
+                                    text = "$volText$targetText",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = FillmarkCyan
+                                )
+                            }
+                            if (inspectedBar.dateIso != null) {
+                                TextButton(onClick = { viewModel.inspectDate(inspectedBar.dateIso) }) {
+                                    Text("View Day", color = FillmarkCyan, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // Feature Metric Grid (2x2) with tiny card-integrated iconography
+        // Feature Metric Grid (2x2)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -258,20 +330,93 @@ fun AnalyticsScreen(
                 title = "Goal Hit Rate",
                 value = if (hasTarget) "$successRate%" else "0%",
                 icon = Icons.Outlined.TrackChanges,
-                subtitle = if (hasTarget) "${uiState.daysGoalMet} of ${uiState.totalDays} days" else null,
+                subtitle = if (hasTarget && uiState.totalDays > 0) "${uiState.daysGoalMet} of ${uiState.totalDays} days" else null,
                 modifier = Modifier.weight(1f)
             )
 
+            val streakLabel = if (uiState.currentStreak == 1) "1 day" else "${uiState.currentStreak} days"
+            val bestLabel = if (uiState.bestStreak == 1) "1 day" else "${uiState.bestStreak} days"
             MetricCard(
-                title = "Active Unit",
-                value = uiState.displayUnit.symbol,
-                icon = Icons.Outlined.BarChart,
-                subtitle = uiState.displayUnit.label,
+                title = "Goal Streak",
+                value = streakLabel,
+                icon = Icons.Outlined.LocalFireDepartment,
+                subtitle = "Best: $bestLabel",
                 modifier = Modifier.weight(1f)
             )
         }
 
+        if (uiState.drinkBreakdown.isNotEmpty()) {
+            DrinkBreakdownCard(
+                items = uiState.drinkBreakdown,
+                displayUnit = uiState.displayUnit
+            )
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun DrinkBreakdownCard(
+    items: List<DrinkTypeBreakdownItem>,
+    displayUnit: com.fillmark.app.core.DisplayUnit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Drink Breakdown",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            items.forEach { item ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = item.drinkType.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${VolumeConverter.formatVolume(item.volumeMl, displayUnit)} (${item.percentage.roundToInt()}%)",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth((item.percentage / 100f).coerceIn(0.02f, 1f))
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -377,7 +522,6 @@ private fun DailyGraphLegend(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Line indicator for intake/rate
         Row(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -396,7 +540,6 @@ private fun DailyGraphLegend(
 
         if (hasTarget) {
             if (mode == DailyGraphMode.CUMULATIVE) {
-                // Target line
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -414,7 +557,6 @@ private fun DailyGraphLegend(
                     )
                 }
 
-                // Target Pace
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -432,7 +574,6 @@ private fun DailyGraphLegend(
                     )
                 }
             } else {
-                // Rate Target Line
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -457,6 +598,7 @@ private fun DailyGraphLegend(
 @Composable
 private fun PeriodNavigationBar(
     periodLabel: String,
+    canGoPrevious: Boolean,
     canGoNext: Boolean,
     showJumpToCurrent: Boolean,
     onPrevious: () -> Unit,
@@ -471,20 +613,19 @@ private fun PeriodNavigationBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Previous period button
         IconButton(
             onClick = onPrevious,
+            enabled = canGoPrevious,
             modifier = Modifier.size(36.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.NavigateBefore,
                 contentDescription = "Previous period",
-                tint = MaterialTheme.colorScheme.onBackground,
+                tint = if (canGoPrevious) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                 modifier = Modifier.size(22.dp)
             )
         }
 
-        // Center period label
         Text(
             text = periodLabel,
             style = MaterialTheme.typography.titleSmall,
@@ -496,7 +637,6 @@ private fun PeriodNavigationBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            // Little icon to jump back to the current time period
             if (showJumpToCurrent) {
                 IconButton(
                     onClick = onJumpToCurrent,
@@ -511,7 +651,6 @@ private fun PeriodNavigationBar(
                 }
             }
 
-            // Next period button
             IconButton(
                 onClick = onNext,
                 enabled = canGoNext,

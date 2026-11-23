@@ -27,6 +27,7 @@ data class DayGroup(
 data class HistoryUiState(
     val dayGroups: List<DayGroup> = emptyList(),
     val displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
+    val hydrationFactorsEnabled: Boolean = true,
     val editingRecord: HydrationRecordEntity? = null,
     val recentlyDeletedRecord: HydrationRecordEntity? = null,
     val snackbarMessage: String? = null
@@ -49,13 +50,14 @@ class HistoryViewModel @JvmOverloads constructor(
                 repository.preferencesFlow,
                 currentDateFlow
             ) { records, prefs, _ ->
+                val factorsEnabled = prefs.hydrationFactorsEnabled
                 val grouped = records
                     .groupBy { TimeUtils.toIsoDate(it.timestamp) }
                     .map { (dateIso, groupRecords) ->
                         DayGroup(
                             dateIso = dateIso,
                             friendlyDate = TimeUtils.formatFriendlyDate(dateIso),
-                            totalEffectiveVolumeMl = groupRecords.sumOf { it.effectiveVolumeMl },
+                            totalEffectiveVolumeMl = groupRecords.sumOf { it.countedVolumeMl(factorsEnabled) },
                             records = groupRecords.sortedByDescending { it.timestamp }
                         )
                     }
@@ -64,7 +66,8 @@ class HistoryViewModel @JvmOverloads constructor(
                 _uiState.update {
                     it.copy(
                         dayGroups = grouped,
-                        displayUnit = prefs.displayUnit
+                        displayUnit = prefs.displayUnit,
+                        hydrationFactorsEnabled = factorsEnabled
                     )
                 }
             }.collect {}

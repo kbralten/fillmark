@@ -57,6 +57,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ManualLogBottomSheet(
     displayUnit: DisplayUnit,
+    hydrationFactorsEnabled: Boolean = true,
     onDismiss: () -> Unit,
     onLogRecord: (volumeMl: Double, factor: Double, drinkType: String, timestamp: Long) -> Unit,
     sheetState: SheetState
@@ -172,35 +173,37 @@ fun ManualLogBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (hydrationFactorsEnabled) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Hydration Factor Preview
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Hydration Factor Preview
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "Water Factor: ${selectedDrinkType.defaultHydrationFactor}x",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val effectiveText = if (selectedUnit != displayUnit) {
-                        "${VolumeConverter.formatVolume(effectiveMl, selectedUnit)} (${VolumeConverter.formatVolume(effectiveMl, displayUnit)})"
-                    } else {
-                        VolumeConverter.formatVolume(effectiveMl, selectedUnit)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Water Factor: ${selectedDrinkType.defaultHydrationFactor}x",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        val effectiveText = if (selectedUnit != displayUnit) {
+                            "${VolumeConverter.formatVolume(effectiveMl, selectedUnit)} (${VolumeConverter.formatVolume(effectiveMl, displayUnit)})"
+                        } else {
+                            VolumeConverter.formatVolume(effectiveMl, selectedUnit)
+                        }
+                        Text(
+                            text = "Effective: $effectiveText",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                    Text(
-                        text = "Effective: $effectiveText",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 }
             }
 

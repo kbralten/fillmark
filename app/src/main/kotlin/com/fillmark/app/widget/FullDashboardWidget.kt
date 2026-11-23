@@ -114,7 +114,7 @@ class FullDashboardWidget : GlanceAppWidget() {
                 280
             }
 
-            val effectiveTotalMl = todayRecords.sumOf { it.effectiveVolumeMl }
+            val effectiveTotalMl = todayRecords.sumOf { it.countedVolumeMl(prefs.hydrationFactorsEnabled) }
             val targetMl = targetEntity?.targetMl ?: prefs.defaultDailyTargetMl
             val hasTarget = targetMl > 0
             val rawRatio = if (hasTarget) (effectiveTotalMl / targetMl).toFloat() else 0f
@@ -144,6 +144,9 @@ class FullDashboardWidget : GlanceAppWidget() {
                 )
             }
 
+            val canUndo = prefs.lastWidgetLogRecordId != null &&
+                (System.currentTimeMillis() - prefs.lastWidgetLogTimeMillis) <= 30_000L
+
             FullDashboardContent(
                 hasTarget = hasTarget,
                 consumedText = VolumeConverter.formatVolume(effectiveTotalMl, prefs.displayUnit),
@@ -152,7 +155,8 @@ class FullDashboardWidget : GlanceAppWidget() {
                 percentDisplay = percentDisplay,
                 pacing = pacing,
                 presets = presets,
-                displayUnit = prefs.displayUnit
+                displayUnit = prefs.displayUnit,
+                canUndo = canUndo
             )
         }
     }
@@ -166,7 +170,8 @@ class FullDashboardWidget : GlanceAppWidget() {
         percentDisplay: Int,
         pacing: PacingResult?,
         presets: List<PresetEntity>,
-        displayUnit: DisplayUnit
+        displayUnit: DisplayUnit,
+        canUndo: Boolean
     ) {
         Column(
             modifier = GlanceModifier
@@ -195,6 +200,25 @@ class FullDashboardWidget : GlanceAppWidget() {
                         )
                     )
                     Spacer(modifier = GlanceModifier.defaultWeight())
+                    if (canUndo) {
+                        Box(
+                            modifier = GlanceModifier
+                                .background(ColorProvider(Color(0xFF1F3B54)))
+                                .cornerRadius(10.dp)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .clickable(actionRunCallback<UndoWidgetLogActionCallback>())
+                        ) {
+                            Text(
+                                text = "Undo",
+                                style = TextStyle(
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ColorProvider(Color(0xFF34F3FF))
+                                )
+                            )
+                        }
+                        Spacer(modifier = GlanceModifier.width(8.dp))
+                    }
                     Text(
                         text = if (hasTarget) "$percentDisplay%" else "Today",
                         style = TextStyle(

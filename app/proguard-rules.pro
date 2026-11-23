@@ -31,6 +31,9 @@
     public <init>();
 }
 
+# Backup DTOs
+-keep class com.fillmark.app.data.backup.** { *; }
+
 # ViewModels
 -keep class * extends androidx.lifecycle.ViewModel {
     public <init>(...);

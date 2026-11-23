@@ -1,16 +1,30 @@
 package com.fillmark.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.fillmark.app.core.ShortcutHelper
+import com.fillmark.app.data.local.ThemeMode
+import com.fillmark.app.data.local.UserPreferences
 import com.fillmark.app.data.local.UserPreferencesRepository
+import com.fillmark.app.data.repository.HydrationRepository
 import com.fillmark.app.sync.HealthConnectManager
+import com.fillmark.app.ui.onboarding.OnboardingScreen
 import com.fillmark.app.ui.theme.FillmarkTheme
 import com.fillmark.app.widget.MidnightAlarmScheduler
 import com.fillmark.app.widget.WidgetUpdateHelper
@@ -18,25 +32,113 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
 
-    enableEdgeToEdge()
-    setContent {
-      FillmarkTheme { Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { MainNavigation() } }
-    }
-  }
+    private var isInitialized by mutableStateOf(false)
+    private var pendingShortcutPresetId by mutableStateOf<String?>(null)
+    private var pendingOpenManualLog by mutableStateOf(false)
 
-  override fun onResume() {
-    super.onResume()
-    MidnightAlarmScheduler.scheduleMidnightReset(this)
-    lifecycleScope.launch {
-      WidgetUpdateHelper.updateAllWidgets(this@MainActivity)
-      val prefs = UserPreferencesRepository(this@MainActivity).preferencesFlow.first()
-      if (prefs.healthConnectSyncEnabled) {
-        HealthConnectManager.schedulePeriodicSync(this@MainActivity)
-        HealthConnectManager.enqueueImmediateSync(this@MainActivity)
-      }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
+        super.onCreate(savedInstanceState)
+
+        splashScreen.setKeepOnScreenCondition { !isInitialized }
+        handleIntentExtras(intent)
+
+        val prefsRepo = UserPreferencesRepository(this)
+        val hydrationRepo = HydrationRepository(this)
+
+        lifecycleScope.launch {
+            val prefs = prefsRepo.preferencesFlow.first()
+            // Skip onboarding automatically for upgrading users who already have records
+            if (!prefs.onboardingCompleted && hydrationRepo.hasAnyRecords()) {
+                prefsRepo.setOnboardingCompleted(true)
+            }
+            isInitialized = true
+        }
+
+        enableEdgeToEdge()
+        setContent {
+            val prefs by prefsRepo.preferencesFlow.collectAsStateWithLifecycle(
+                initialValue = UserPreferences(onboardingCompleted = true)
+            )
+            val isDark = when (prefs.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+
+            LaunchedEffect(isDark) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (isDark) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                    },
+                    navigationBarStyle = if (isDark) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                    }
+                )
+            }
+
+            FillmarkTheme(
+                darkTheme = isDark,
+                dynamicColor = prefs.dynamicColorEnabled
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    if (isInitialized && !prefs.onboardingCompleted) {
+                        OnboardingScreen(
+                            initialUnit = prefs.displayUnit,
+                            onCompleted = {}
+                        )
+                    } else if (isInitialized) {
+                        MainNavigation(
+                            pendingShortcutPresetId = pendingShortcutPresetId,
+                            pendingOpenManualLog = pendingOpenManualLog,
+                            onShortcutHandled = {
+                                pendingShortcutPresetId = null
+                                pendingOpenManualLog = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
-  }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntentExtras(intent)
+    }
+
+    private fun handleIntentExtras(intent: Intent?) {
+        val presetId = intent?.getStringExtra(ShortcutHelper.EXTRA_QUICK_LOG_PRESET_ID)
+        val openManual = intent?.getBooleanExtra(ShortcutHelper.EXTRA_OPEN_MANUAL_LOG, false) == true
+        if (presetId != null) {
+            pendingShortcutPresetId = presetId
+            intent.removeExtra(ShortcutHelper.EXTRA_QUICK_LOG_PRESET_ID)
+        }
+        if (openManual) {
+            pendingOpenManualLog = true
+            intent?.removeExtra(ShortcutHelper.EXTRA_OPEN_MANUAL_LOG)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        MidnightAlarmScheduler.scheduleMidnightReset(this)
+        lifecycleScope.launch {
+            WidgetUpdateHelper.updateAllWidgets(this@MainActivity)
+            val prefs = UserPreferencesRepository(this@MainActivity).preferencesFlow.first()
+            if (prefs.healthConnectSyncEnabled) {
+                HealthConnectManager.schedulePeriodicSync(this@MainActivity)
+                HealthConnectManager.enqueueImmediateSync(this@MainActivity)
+            }
+        }
+    }
 }

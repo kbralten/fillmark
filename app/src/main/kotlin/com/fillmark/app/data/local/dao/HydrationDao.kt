@@ -64,5 +64,8 @@ interface HydrationDao {
 
     @Query("SELECT MIN(timestamp) FROM hydration_records")
     suspend fun getEarliestRecordTimestamp(): Long?
+
+    @Query("DELETE FROM hydration_records")
+    suspend fun deleteAllRecords()
 }
 

@@ -9,6 +9,7 @@ import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.FillmarkDatabase
 import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
+import com.fillmark.app.data.repository.HydrationRepository
 import com.fillmark.app.sync.HealthConnectManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -29,45 +30,63 @@ class QuickLogActionCallback : ActionCallback {
         val database = FillmarkDatabase.getInstance(context)
         val preset = database.presetDao().getPresetById(presetId) ?: return
 
+        val now = System.currentTimeMillis()
         val record = HydrationRecordEntity(
             id = UUID.randomUUID().toString(),
-            timestamp = System.currentTimeMillis(),
+            timestamp = now,
             volumeMl = preset.volumeMl,
             hydrationFactor = preset.hydrationFactor,
             drinkType = preset.drinkType,
             iconKey = preset.iconKey,
-            lastModified = System.currentTimeMillis()
+            lastModified = now
         )
         database.hydrationDao().insertRecord(record)
 
-        // Show instant visual confirmation feedback (Item 8)
         val prefsRepo = UserPreferencesRepository(context)
         val prefs = prefsRepo.preferencesFlow.first()
+        prefsRepo.setLastWidgetLog(record.id, preset.label, now)
         val volumeStr = VolumeConverter.formatVolume(preset.volumeMl, prefs.displayUnit)
 
         withContext(Dispatchers.Main) {
             Toast.makeText(
                 context,
-                "💧 Logged +$volumeStr (${preset.label})",
+                "Logged +$volumeStr (${preset.label})",
                 Toast.LENGTH_SHORT
             ).show()
         }
 
-        // Trigger Health Connect sync reliably via WorkManager if enabled
         if (prefs.healthConnectSyncEnabled) {
             HealthConnectManager.enqueueImmediateSync(context, replace = true)
         }
 
-        // Reschedule midnight alarm to be sure
         MidnightAlarmScheduler.scheduleMidnightReset(context)
 
-        // Immediately update this widget instance directly (Item 9)
         runCatching { FullDashboardWidget().update(context, glanceId) }
         runCatching { ProgressMeterWidget().update(context, glanceId) }
         runCatching { QuickLogBarWidget().update(context, glanceId) }
 
-        // Notify all widgets to refresh immediately
         WidgetUpdateHelper.updateAllWidgets(context)
     }
 }
 
+class UndoWidgetLogActionCallback : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val prefsRepo = UserPreferencesRepository(context)
+        val prefs = prefsRepo.preferencesFlow.first()
+        val recordId = prefs.lastWidgetLogRecordId ?: return
+        val label = prefs.lastWidgetLogLabel ?: "drink"
+
+        HydrationRepository(context).deleteRecordById(recordId)
+        prefsRepo.setLastWidgetLog(null, null, 0L)
+
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, "Undid $label", Toast.LENGTH_SHORT).show()
+        }
+
+        WidgetUpdateHelper.updateAllWidgets(context)
+    }
+}

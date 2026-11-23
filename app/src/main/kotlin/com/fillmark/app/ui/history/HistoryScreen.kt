@@ -136,6 +136,7 @@ fun HistoryScreen(
                         HistoryRecordItem(
                             record = record,
                             displayUnit = uiState.displayUnit,
+                            hydrationFactorsEnabled = uiState.hydrationFactorsEnabled,
                             onClick = { viewModel.startEditing(record) },
                             onDelete = { viewModel.deleteRecord(record) },
                             modifier = Modifier.padding(horizontal = 16.dp)
@@ -192,6 +193,7 @@ private fun DayHeader(
 private fun HistoryRecordItem(
     record: HydrationRecordEntity,
     displayUnit: com.fillmark.app.core.DisplayUnit,
+    hydrationFactorsEnabled: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
@@ -245,12 +247,12 @@ private fun HistoryRecordItem(
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = VolumeConverter.formatVolume(record.effectiveVolumeMl, displayUnit),
+                    text = VolumeConverter.formatVolume(record.countedVolumeMl(hydrationFactorsEnabled), displayUnit),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (record.hydrationFactor != 1.0) {
+                if (hydrationFactorsEnabled && record.hydrationFactor != 1.0) {
                     Text(
                         text = "Factor: ${record.hydrationFactor}x",
                         style = MaterialTheme.typography.labelSmall,

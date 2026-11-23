@@ -19,15 +19,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -35,11 +40,14 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -48,12 +56,15 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
+import com.fillmark.app.ui.common.UnitToggle
 import com.fillmark.app.ui.dashboard.components.CustomizePresetsDialog
 import com.fillmark.app.ui.dashboard.components.FluidProgressMeter
 import com.fillmark.app.ui.dashboard.components.ManualLogBottomSheet
@@ -67,11 +78,24 @@ import com.fillmark.app.ui.theme.FillmarkNavy900
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    pendingShortcutPresetId: String? = null,
+    pendingOpenManualLog: Boolean = false,
+    onShortcutHandled: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LaunchedEffect(pendingShortcutPresetId, pendingOpenManualLog) {
+        if (pendingShortcutPresetId != null) {
+            viewModel.logPresetById(pendingShortcutPresetId)
+            onShortcutHandled()
+        } else if (pendingOpenManualLog) {
+            viewModel.openManualLogSheet()
+            onShortcutHandled()
+        }
+    }
 
     LifecycleResumeEffect(Unit) {
         viewModel.refreshCurrentTime()
@@ -163,6 +187,8 @@ fun DashboardScreen(
                     targetMl = uiState.targetMl,
                     displayUnit = uiState.displayUnit,
                     pacingResult = uiState.pacingResult,
+                    isTargetOverridden = uiState.isTargetOverridden,
+                    onTargetClick = { viewModel.openTodayTargetDialog() },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -228,6 +254,7 @@ fun DashboardScreen(
                     TodayLogItem(
                         record = record,
                         displayUnit = uiState.displayUnit,
+                        hydrationFactorsEnabled = uiState.hydrationFactorsEnabled,
                         onClick = { viewModel.startEditingRecord(record) },
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
@@ -242,6 +269,7 @@ fun DashboardScreen(
         if (uiState.isManualLogSheetOpen) {
             ManualLogBottomSheet(
                 displayUnit = uiState.displayUnit,
+                hydrationFactorsEnabled = uiState.hydrationFactorsEnabled,
                 onDismiss = { viewModel.closeManualLogSheet() },
                 onLogRecord = { volume, factor, drinkType, timestamp ->
                     viewModel.logCustom(volume, factor, drinkType, timestamp)
@@ -283,7 +311,131 @@ fun DashboardScreen(
                 onDelete = { viewModel.deleteRecord(recordToEdit) }
             )
         }
+
+        if (uiState.isTodayTargetDialogOpen) {
+            AdjustTodayTargetDialog(
+                currentTargetMl = uiState.targetMl,
+                defaultTargetMl = uiState.defaultTargetMl,
+                isOverridden = uiState.isTargetOverridden,
+                displayUnit = uiState.displayUnit,
+                onDismiss = { viewModel.dismissTodayTargetDialog() },
+                onSave = { ml -> viewModel.setTodayTargetOverride(ml) },
+                onResetToDefault = { viewModel.resetTodayTargetToDefault() }
+            )
+        }
     }
+}
+
+@Composable
+private fun AdjustTodayTargetDialog(
+    currentTargetMl: Double,
+    defaultTargetMl: Double,
+    isOverridden: Boolean,
+    displayUnit: DisplayUnit,
+    onDismiss: () -> Unit,
+    onSave: (Double) -> Unit,
+    onResetToDefault: () -> Unit
+) {
+    var selectedUnit by remember { mutableStateOf(displayUnit) }
+    var targetInput by remember {
+        mutableStateOf(
+            if (currentTargetMl > 0) {
+                VolumeConverter.formatInputNumber(currentTargetMl, displayUnit)
+            } else {
+                if (displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
+            }
+        )
+    }
+
+    val parsed = targetInput.toDoubleOrNull() ?: 0.0
+    val ml = VolumeConverter.toInternalMl(parsed, selectedUnit)
+    val isValid = ml > 0 && ml <= VolumeConverter.MAX_DAILY_TARGET_ML
+    val errorText = when {
+        targetInput.isBlank() || ml <= 0 -> "Enter a goal greater than 0"
+        ml > VolumeConverter.MAX_DAILY_TARGET_ML ->
+            "Max target is ${VolumeConverter.formatVolume(VolumeConverter.MAX_DAILY_TARGET_ML, selectedUnit)}"
+        else -> null
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Today's Goal Override",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Adjust your goal for today only (e.g., workout or hot day). Past and future days keep your default target.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Unit",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    UnitToggle(
+                        selectedUnit = selectedUnit,
+                        onUnitSelected = { newUnit ->
+                            if (newUnit != selectedUnit) {
+                                targetInput = VolumeConverter.convertInputVolume(targetInput, selectedUnit, newUnit)
+                                selectedUnit = newUnit
+                            }
+                        }
+                    )
+                }
+
+                OutlinedTextField(
+                    value = targetInput,
+                    onValueChange = { targetInput = VolumeConverter.sanitizeDecimalInput(it) },
+                    label = { Text("Today's Target (${selectedUnit.symbol})") },
+                    suffix = { Text(selectedUnit.symbol) },
+                    singleLine = true,
+                    isError = errorText != null,
+                    supportingText = errorText?.let { msg -> { Text(msg) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (isOverridden) {
+                    val defaultText = if (defaultTargetMl > 0) {
+                        VolumeConverter.formatVolume(defaultTargetMl, selectedUnit)
+                    } else {
+                        "No Goal"
+                    }
+                    TextButton(
+                        onClick = onResetToDefault,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Reset to Default ($defaultText)")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (isValid) onSave(ml) },
+                enabled = isValid
+            ) {
+                Text("Save for Today")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -385,6 +537,7 @@ fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
 private fun TodayLogItem(
     record: HydrationRecordEntity,
     displayUnit: com.fillmark.app.core.DisplayUnit,
+    hydrationFactorsEnabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -437,12 +590,12 @@ private fun TodayLogItem(
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = VolumeConverter.formatVolume(record.effectiveVolumeMl, displayUnit),
+                    text = VolumeConverter.formatVolume(record.countedVolumeMl(hydrationFactorsEnabled), displayUnit),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (record.hydrationFactor != 1.0) {
+                if (hydrationFactorsEnabled && record.hydrationFactor != 1.0) {
                     Text(
                         text = "Raw: ${VolumeConverter.formatVolume(record.volumeMl, displayUnit)}",
                         style = MaterialTheme.typography.labelSmall,

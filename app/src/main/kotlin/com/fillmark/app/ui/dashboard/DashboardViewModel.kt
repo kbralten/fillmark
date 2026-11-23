@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.DrinkType
 import com.fillmark.app.core.PresetIcon
+import com.fillmark.app.core.ShortcutHelper
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.data.local.entity.PresetEntity
@@ -27,16 +28,21 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 data class DashboardUiState(
     val dateHeader: String = TimeUtils.formatCurrentDateHeader(),
     val effectiveVolumeMl: Double = 0.0,
     val targetMl: Double = 2500.0,
+    val defaultTargetMl: Double = 2500.0,
+    val isTargetOverridden: Boolean = false,
+    val hydrationFactorsEnabled: Boolean = true,
     val displayUnit: DisplayUnit = DisplayUnit.METRIC_ML,
     val presets: List<PresetEntity> = emptyList(),
     val todayRecords: List<HydrationRecordEntity> = emptyList(),
     val pacingResult: PacingResult? = null,
     val isManualLogSheetOpen: Boolean = false,
+    val isTodayTargetDialogOpen: Boolean = false,
     val editingRecord: HydrationRecordEntity? = null,
     val lastLoggedRecord: HydrationRecordEntity? = null,
     val recentlyDeletedRecord: HydrationRecordEntity? = null,
@@ -98,6 +104,9 @@ class DashboardViewModel @JvmOverloads constructor(
                         dateHeader = TimeUtils.formatCurrentDateHeader(now.zone),
                         effectiveVolumeMl = summary.effectiveVolumeMl,
                         targetMl = summary.targetMl,
+                        defaultTargetMl = summary.defaultTargetMl,
+                        isTargetOverridden = summary.isTargetOverridden,
+                        hydrationFactorsEnabled = summary.hydrationFactorsEnabled,
                         displayUnit = prefs.displayUnit,
                         presets = presets,
                         todayRecords = summary.records,
@@ -114,6 +123,15 @@ class DashboardViewModel @JvmOverloads constructor(
 
     fun logPreset(preset: PresetEntity) {
         viewModelScope.launch {
+            val record = repository.logPreset(preset)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            showUndoSnackbar(loggedRecord = record, deletedRecord = null, message = "Added ${preset.label}")
+        }
+    }
+
+    fun logPresetById(presetId: String) {
+        viewModelScope.launch {
+            val preset = repository.getPresets().firstOrNull { it.id == presetId } ?: return@launch
             val record = repository.logPreset(preset)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
             showUndoSnackbar(loggedRecord = record, deletedRecord = null, message = "Added ${preset.label}")
@@ -138,6 +156,32 @@ class DashboardViewModel @JvmOverloads constructor(
                 deletedRecord = null,
                 message = "Logged ${drinkType.lowercase().replaceFirstChar { it.uppercase() }}"
             )
+        }
+    }
+
+    fun openTodayTargetDialog() {
+        _uiState.update { it.copy(isTodayTargetDialogOpen = true) }
+    }
+
+    fun dismissTodayTargetDialog() {
+        _uiState.update { it.copy(isTodayTargetDialogOpen = false) }
+    }
+
+    fun setTodayTargetOverride(targetMl: Double) {
+        viewModelScope.launch {
+            val todayIso = currentTimeTicker.value.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+            repository.setTargetForDate(todayIso, targetMl)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            _uiState.update { it.copy(isTodayTargetDialogOpen = false) }
+        }
+    }
+
+    fun resetTodayTargetToDefault() {
+        viewModelScope.launch {
+            val todayIso = currentTimeTicker.value.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+            repository.clearTargetOverrideForDate(todayIso)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
+            _uiState.update { it.copy(isTodayTargetDialogOpen = false) }
         }
     }
 
@@ -253,6 +297,7 @@ class DashboardViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             repository.reorderPresets(orderedPresets)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
+            ShortcutHelper.updateShortcuts(getApplication())
         }
     }
 
@@ -273,6 +318,7 @@ class DashboardViewModel @JvmOverloads constructor(
                 repository.addPreset(preset)
             }
             WidgetUpdateHelper.updateAllWidgets(getApplication())
+            ShortcutHelper.updateShortcuts(getApplication())
             dismissPresetEditor()
         }
     }
@@ -281,6 +327,7 @@ class DashboardViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             repository.deletePreset(presetId)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
+            ShortcutHelper.updateShortcuts(getApplication())
             dismissPresetEditor()
         }
     }
