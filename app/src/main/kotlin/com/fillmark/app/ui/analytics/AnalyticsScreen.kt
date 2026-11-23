@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.domain.DailyGraphMode
+import com.fillmark.app.domain.DailyLineChartData
 import com.fillmark.app.ui.analytics.components.BarChart
 import com.fillmark.app.ui.analytics.components.DailyLineChart
 import com.fillmark.app.ui.theme.FillmarkCardBorder
@@ -186,9 +187,15 @@ fun AnalyticsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 AnimatedContent(
-                    targetState = uiState.periodOffset,
+                    targetState = ChartTransitionState(
+                        periodOffset = uiState.periodOffset,
+                        interval = uiState.selectedInterval,
+                        dailyLineChartData = uiState.dailyLineChartData,
+                        bars = uiState.bars
+                    ),
+                    contentKey = { it.periodOffset },
                     transitionSpec = {
-                        if (targetState > initialState) {
+                        if (targetState.periodOffset > initialState.periodOffset) {
                             (slideInHorizontally { -it } + fadeIn()).togetherWith(
                                 slideOutHorizontally { it } + fadeOut()
                             )
@@ -199,11 +206,11 @@ fun AnalyticsScreen(
                         }
                     },
                     label = "PeriodChartTransition"
-                ) { _ ->
-                    if (uiState.selectedInterval == AnalyticsInterval.DAY) {
-                        DailyLineChart(data = uiState.dailyLineChartData)
+                ) { state ->
+                    if (state.interval == AnalyticsInterval.DAY) {
+                        DailyLineChart(data = state.dailyLineChartData)
                     } else {
-                        BarChart(bars = uiState.bars)
+                        BarChart(bars = state.bars)
                     }
                 }
             }
@@ -517,3 +524,10 @@ private fun PeriodNavigationBar(
         }
     }
 }
+
+private data class ChartTransitionState(
+    val periodOffset: Int,
+    val interval: AnalyticsInterval,
+    val dailyLineChartData: DailyLineChartData,
+    val bars: List<ChartBarData>
+)

@@ -3,5 +3,6 @@
     <string name="widget_progress_meter_description">Fillmark water progress meter</string>
     <string name="widget_quick_log_bar_description">Fillmark quick drink log presets</string>
     <string name="widget_full_dashboard_description">Fillmark full drink progress and presets</string>
-    <string name="health_connect_rationale">Fillmark uses Health Connect to sync your drink logs bidirectionally with other health apps while maintaining local privacy.</string>
+    <string name="health_connect_rationale">Fillmark uses Android Health Connect (read and write hydration permissions) to sync your drink logs with other health and fitness apps on your device.\n\nFillmark operates no developer or third-party cloud servers, user accounts, analytics, or advertising trackers. Your data stays on your device, and if Android Cloud Auto Backup is enabled on your phone, it is backed up solely to your own personal Google Account.</string>
+    <string name="privacy_policy_url">https://kbralten.github.io/fillmark/privacy.html</string>
 </resources>

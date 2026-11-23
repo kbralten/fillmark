@@ -8,7 +8,7 @@ Fillmark is designed to make drink tracking effortless and friction-free. With o
 
 ## Highlights
 
-- 🔒 **Local-First & Zero-Auth:** No accounts, passwords, analytics, or third-party cloud servers. All personal health data stays securely on your device.
+- 🔒 **Local-First & Zero-Auth:** No accounts, passwords, analytics, or developer/third-party cloud servers. All personal health data stays on your device (and, if Android Auto Backup is enabled on your phone, backs up solely to your own personal Google Account).
 - ⚡ **Instant Logging:** Record drinks in under a second using one-tap presets with quick undo support.
 - ⏱️ **Smart Waking-Hours Pacing:** Dynamic pacing tells you if you are ahead, on track, or behind schedule based on your custom wake and sleep hours.
 - 📱 **Home Screen Widgets:** Log water and monitor your progress directly from your home screen using reactive Jetpack Glance widgets.
@@ -102,7 +102,7 @@ app/src/main/kotlin/com/fillmark/app/
 
 2. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/fillmark.git
+   git clone https://github.com/kbralten/fillmark.git
    cd fillmark
    ```
 
@@ -128,8 +128,9 @@ app/src/main/kotlin/com/fillmark/app/
 Fillmark was conceived with privacy as a foundational requirement:
 - **No analytics or crash-reporting telemetry.**
 - **No advertising SDKs or identifiers.**
-- **No external server calls**—network connectivity is never required to track hydration.
-- You retain complete ownership of your data at all times.
+- **No developer or third-party cloud servers**—network connectivity is never required to track hydration.
+- **Android Cloud Auto Backup & Device Transfer:** Fillmark supports Android's built-in Auto Backup so your drink logs, presets, and settings can be restored across devices. Backups are encrypted and stored solely within **your own personal Google Account**—nothing leaves your Google Account or is ever sent to Fillmark or any third-party server.
+- You retain complete ownership of your data at all times. Read the full [Privacy Policy](https://kbralten.github.io/fillmark/privacy.html).
 
 ---
 

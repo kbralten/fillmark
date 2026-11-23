@@ -73,7 +73,11 @@ class HealthConnectManager(private val context: Context) {
                     startZoneOffset = zoneOffset,
                     endTime = endTime,
                     endZoneOffset = zoneOffset,
-                    volume = Volume.milliliters(record.volumeMl)
+                    volume = Volume.milliliters(record.volumeMl),
+                    metadata = Metadata.manualEntry(
+                        clientRecordId = record.id,
+                        clientRecordVersion = record.lastModified
+                    )
                 )
 
                 val response = client.insertRecords(listOf(hcRecord))
@@ -108,7 +112,7 @@ class HealthConnectManager(private val context: Context) {
                     endTime = endTime,
                     endZoneOffset = zoneOffset,
                     volume = Volume.milliliters(record.volumeMl),
-                    metadata = Metadata(id = hcId)
+                    metadata = Metadata.manualEntryWithId(id = hcId)
                 )
 
                 try {
@@ -125,7 +129,11 @@ class HealthConnectManager(private val context: Context) {
                         startZoneOffset = zoneOffset,
                         endTime = endTime,
                         endZoneOffset = zoneOffset,
-                        volume = Volume.milliliters(record.volumeMl)
+                        volume = Volume.milliliters(record.volumeMl),
+                        metadata = Metadata.manualEntry(
+                            clientRecordId = record.id,
+                            clientRecordVersion = record.lastModified
+                        )
                     )
                     val response = client.insertRecords(listOf(newHcRecord))
                     val newHcId = response.recordIdsList.firstOrNull()
