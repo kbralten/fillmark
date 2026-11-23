@@ -20,7 +20,8 @@ object WidgetProgressBarGenerator {
         progress: Float,
         paceRatio: Float?,
         widthDp: Int = 280,
-        heightDp: Int = 20
+        heightDp: Int = 20,
+        isDark: Boolean = true
     ): Bitmap {
         val density = context.resources.displayMetrics.density
         val widthPx = (widthDp * density).toInt().coerceAtLeast(100)
@@ -32,7 +33,7 @@ object WidgetProgressBarGenerator {
         val barTop = (heightPx - barHeight) / 2f
         val cornerRadius = barHeight / 2f
 
-        // 1. Background Track (Deep midnight navy pill)
+        // 1. Background Track
         val trackPath = Path().apply {
             addRoundRect(
                 RectF(0f, barTop, widthPx.toFloat(), barTop + barHeight),
@@ -42,7 +43,7 @@ object WidgetProgressBarGenerator {
             )
         }
         val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.parseColor("#0C2438")
+            color = android.graphics.Color.parseColor(if (isDark) "#0C2438" else "#DCE8F2")
         }
         canvas.drawPath(trackPath, trackPaint)
 

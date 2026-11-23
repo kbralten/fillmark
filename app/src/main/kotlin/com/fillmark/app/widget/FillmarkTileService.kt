@@ -63,7 +63,8 @@ class FillmarkTileService : TileService() {
                 hydrationFactor = factor,
                 drinkType = drinkType,
                 iconKey = iconKey,
-                lastModified = System.currentTimeMillis()
+                lastModified = System.currentTimeMillis(),
+                label = topPreset?.label
             )
             database.hydrationDao().insertRecord(record)
 

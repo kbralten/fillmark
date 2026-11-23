@@ -100,12 +100,14 @@ class SettingsViewModel @JvmOverloads constructor(
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             preferencesRepository.updateThemeMode(mode)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
         }
     }
 
     fun setDynamicColorEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.updateDynamicColorEnabled(enabled)
+            WidgetUpdateHelper.updateAllWidgets(getApplication())
         }
     }
 

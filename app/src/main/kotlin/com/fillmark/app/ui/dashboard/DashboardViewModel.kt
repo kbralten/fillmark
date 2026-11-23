@@ -148,15 +148,23 @@ class DashboardViewModel @JvmOverloads constructor(
         }
     }
 
-    fun logCustom(volumeMl: Double, hydrationFactor: Double, drinkType: String, timestamp: Long) {
+    fun logCustom(
+        volumeMl: Double,
+        hydrationFactor: Double,
+        drinkType: String,
+        timestamp: Long,
+        label: String? = null
+    ) {
         viewModelScope.launch {
             val type = DrinkType.fromId(drinkType)
+            val trimmedLabel = label?.trim()?.ifBlank { null }
             val record = HydrationRecordEntity(
                 timestamp = timestamp,
                 volumeMl = volumeMl,
                 hydrationFactor = hydrationFactor,
                 drinkType = drinkType,
-                iconKey = PresetIcon.defaultForDrinkType(type).id
+                iconKey = PresetIcon.defaultForDrinkType(type).id,
+                label = trimmedLabel
             )
             repository.insertRecord(record)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
@@ -166,7 +174,7 @@ class DashboardViewModel @JvmOverloads constructor(
                 deletedRecord = null,
                 message = getApplication<Application>().getString(
                     R.string.dashboard_logged_drink,
-                    drinkType.lowercase().replaceFirstChar { it.uppercase() }
+                    trimmedLabel ?: type.displayName
                 )
             )
         }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.EditCalendar
 import androidx.compose.material.icons.outlined.History
@@ -52,14 +53,16 @@ import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.ui.common.DateTimePickerDialog
 import com.fillmark.app.ui.common.UnitToggle
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualLogBottomSheet(
     displayUnit: DisplayUnit,
     hydrationFactorsEnabled: Boolean = true,
+    initialTimestampMillis: Long? = null,
     onDismiss: () -> Unit,
-    onLogRecord: (volumeMl: Double, factor: Double, drinkType: String, timestamp: Long) -> Unit,
+    onLogRecord: (volumeMl: Double, factor: Double, drinkType: String, timestamp: Long, label: String?) -> Unit,
     sheetState: SheetState
 ) {
     val context = LocalContext.current
@@ -72,14 +75,26 @@ fun ManualLogBottomSheet(
     var volumeInput by remember {
         mutableStateOf(if (displayUnit == DisplayUnit.METRIC_ML) "250" else "8.5")
     }
+    var labelInput by remember { mutableStateOf("") }
     var selectedDrinkType by remember { mutableStateOf(DrinkType.WATER) }
-    var timestampMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    var isOverridden by remember { mutableStateOf(false) }
+    var hydrationFactorInput by remember {
+        mutableStateOf(VolumeConverter.formatHydrationFactor(DrinkType.WATER.defaultHydrationFactor))
+    }
+    var isFactorCustomized by remember { mutableStateOf(false) }
+    var timestampMillis by remember { mutableStateOf(initialTimestampMillis ?: System.currentTimeMillis()) }
+    var isOverridden by remember { mutableStateOf(initialTimestampMillis != null) }
     var showDateTimePicker by remember { mutableStateOf(false) }
 
     val volumeVal = volumeInput.toDoubleOrNull() ?: 0.0
     val internalMl = VolumeConverter.toInternalMl(volumeVal, selectedUnit)
-    val effectiveMl = internalMl * selectedDrinkType.defaultHydrationFactor
+    val parsedFactor = hydrationFactorInput.toDoubleOrNull() ?: 0.0
+    val isFactorValid = !hydrationFactorsEnabled || VolumeConverter.isValidHydrationFactor(parsedFactor)
+    val activeFactor = if (hydrationFactorsEnabled) {
+        if (isFactorValid) parsedFactor else selectedDrinkType.defaultHydrationFactor
+    } else {
+        selectedDrinkType.defaultHydrationFactor
+    }
+    val effectiveMl = internalMl * activeFactor
     val isVolumeValid = internalMl > 0 && internalMl <= VolumeConverter.MAX_SINGLE_DRINK_ML
     val volumeErrorText = when {
         volumeInput.isBlank() || internalMl <= 0 -> stringResource(R.string.error_volume_gt_zero)
@@ -97,6 +112,7 @@ fun ManualLogBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -149,6 +165,17 @@ fun ManualLogBottomSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = labelInput,
+                onValueChange = { labelInput = it },
+                label = { Text(stringResource(R.string.drink_name_optional_label)) },
+                placeholder = { Text(stringResource(R.string.drink_name_placeholder)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // Drink Type Selector Chips
@@ -171,7 +198,14 @@ fun ManualLogBottomSheet(
                     val isSelected = type == selectedDrinkType
                     FilterChip(
                         selected = isSelected,
-                        onClick = { selectedDrinkType = type },
+                        onClick = {
+                            selectedDrinkType = type
+                            if (!isFactorCustomized) {
+                                hydrationFactorInput = VolumeConverter.formatHydrationFactor(
+                                    type.defaultHydrationFactor
+                                )
+                            }
+                        },
                         label = { Text(type.displayName) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -183,6 +217,39 @@ fun ManualLogBottomSheet(
 
             if (hydrationFactorsEnabled) {
                 Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = hydrationFactorInput,
+                    onValueChange = { raw ->
+                        hydrationFactorInput = VolumeConverter.sanitizeDecimalInput(raw)
+                        isFactorCustomized = true
+                    },
+                    label = { Text(stringResource(R.string.hydration_factor_label)) },
+                    suffix = { Text("x") },
+                    trailingIcon = if (abs(parsedFactor - selectedDrinkType.defaultHydrationFactor) > 0.001) {
+                        {
+                            TextButton(
+                                onClick = {
+                                    hydrationFactorInput = VolumeConverter.formatHydrationFactor(
+                                        selectedDrinkType.defaultHydrationFactor
+                                    )
+                                    isFactorCustomized = false
+                                }
+                            ) {
+                                Text(stringResource(R.string.action_reset))
+                            }
+                        }
+                    } else null,
+                    singleLine = true,
+                    isError = !isFactorValid,
+                    supportingText = if (!isFactorValid) {
+                        { Text(stringResource(R.string.hydration_factor_error)) }
+                    } else null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Hydration Factor Preview
                 Surface(
@@ -198,7 +265,7 @@ fun ManualLogBottomSheet(
                         Text(
                             text = stringResource(
                                 R.string.manual_log_water_factor,
-                                selectedDrinkType.defaultHydrationFactor.toString()
+                                VolumeConverter.formatHydrationFactor(activeFactor)
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -345,16 +412,17 @@ fun ManualLogBottomSheet(
 
             Button(
                 onClick = {
-                    if (isVolumeValid) {
+                    if (isVolumeValid && isFactorValid) {
                         onLogRecord(
                             internalMl,
-                            selectedDrinkType.defaultHydrationFactor,
+                            activeFactor,
                             selectedDrinkType.id,
-                            timestampMillis
+                            timestampMillis,
+                            labelInput.trim().ifBlank { null }
                         )
                     }
                 },
-                enabled = isVolumeValid,
+                enabled = isVolumeValid && isFactorValid,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(

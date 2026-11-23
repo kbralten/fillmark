@@ -26,7 +26,7 @@ import java.util.UUID
         DailyTargetEntity::class,
         PendingHealthConnectDeletionEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class FillmarkDatabase : RoomDatabase() {
@@ -60,6 +60,12 @@ abstract class FillmarkDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE hydration_records ADD COLUMN label TEXT")
+            }
+        }
+
         fun getInstance(context: Context): FillmarkDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -68,7 +74,7 @@ abstract class FillmarkDatabase : RoomDatabase() {
                     "fillmark_database"
                 )
                     .addCallback(DatabaseCallback())
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration(false)
                     .build()
                 INSTANCE = instance

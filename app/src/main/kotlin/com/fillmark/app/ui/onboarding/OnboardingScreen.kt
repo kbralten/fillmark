@@ -58,6 +58,7 @@ import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.sync.HealthConnectAvailabilityUi
 import com.fillmark.app.sync.HealthConnectManager
+import com.fillmark.app.ui.common.DailyGoalEstimatorDialog
 import com.fillmark.app.ui.settings.TimePickerField
 import com.fillmark.app.ui.settings.TimePickerModalDialog
 import com.fillmark.app.widget.WidgetUpdateHelper
@@ -86,6 +87,7 @@ fun OnboardingScreen(
     var sleepTime by remember { mutableStateOf("23:00") }
     var showWakePicker by remember { mutableStateOf(false) }
     var showSleepPicker by remember { mutableStateOf(false) }
+    var showEstimatorDialog by remember { mutableStateOf(false) }
     var healthConnectEnabled by remember { mutableStateOf(false) }
 
     var hcSdkStatus by remember { mutableIntStateOf(hcManager.getSdkStatus()) }
@@ -282,6 +284,10 @@ fun OnboardingScreen(
                                 )
                             }
 
+                            TextButton(onClick = { showEstimatorDialog = true }) {
+                                Text(stringResource(R.string.estimator_button))
+                            }
+
                             Text(
                                 text = stringResource(R.string.wellness_disclaimer),
                                 style = MaterialTheme.typography.bodySmall,
@@ -459,6 +465,17 @@ fun OnboardingScreen(
             onConfirm = {
                 sleepTime = it
                 showSleepPicker = false
+            }
+        )
+    }
+    if (showEstimatorDialog) {
+        DailyGoalEstimatorDialog(
+            displayUnit = selectedUnit,
+            onDismiss = { showEstimatorDialog = false },
+            onApplyEstimateMl = { estimatedMl ->
+                hasGoal = true
+                targetInput = VolumeConverter.formatInputNumber(estimatedMl, selectedUnit)
+                showEstimatorDialog = false
             }
         )
     }

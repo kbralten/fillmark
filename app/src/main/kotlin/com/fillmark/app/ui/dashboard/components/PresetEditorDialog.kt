@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,7 @@ import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.PresetEntity
 import com.fillmark.app.ui.common.UnitToggle
 import java.util.UUID
+import kotlin.math.abs
 
 val PRESET_PALETTE = listOf(
     "#2196F3", // Blue
@@ -106,6 +108,19 @@ fun PresetEditorDialog(
     var selectedDrinkType by remember {
         mutableStateOf(DrinkType.fromId(preset?.drinkType ?: "WATER"))
     }
+    var hydrationFactorInput by remember {
+        mutableStateOf(
+            VolumeConverter.formatHydrationFactor(
+                preset?.hydrationFactor ?: DrinkType.fromId(preset?.drinkType ?: "WATER").defaultHydrationFactor
+            )
+        )
+    }
+    var isFactorCustomized by remember {
+        mutableStateOf(
+            preset != null &&
+                abs(preset.hydrationFactor - DrinkType.fromId(preset.drinkType).defaultHydrationFactor) > 0.001
+        )
+    }
     var selectedColorHex by remember {
         mutableStateOf(preset?.colorHex ?: "#2196F3")
     }
@@ -115,6 +130,8 @@ fun PresetEditorDialog(
 
     val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
     val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
+    val parsedFactor = hydrationFactorInput.toDoubleOrNull() ?: 0.0
+    val isFactorValid = VolumeConverter.isValidHydrationFactor(parsedFactor)
     val isLabelValid = labelInput.isNotBlank()
     val isVolumeValid = ml > 0 && ml <= VolumeConverter.MAX_SINGLE_DRINK_ML
     val volumeErrorText = when {
@@ -125,7 +142,7 @@ fun PresetEditorDialog(
         )
         else -> null
     }
-    val canSave = isLabelValid && isVolumeValid
+    val canSave = isLabelValid && isVolumeValid && isFactorValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -223,6 +240,11 @@ fun PresetEditorDialog(
                             selected = isSelected,
                             onClick = {
                                 selectedDrinkType = type
+                                if (!isFactorCustomized) {
+                                    hydrationFactorInput = VolumeConverter.formatHydrationFactor(
+                                        type.defaultHydrationFactor
+                                    )
+                                }
                                 when (type) {
                                     DrinkType.COFFEE -> {
                                         selectedIcon = PresetIcon.MUG
@@ -253,6 +275,40 @@ fun PresetEditorDialog(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Custom Hydration Factor
+                OutlinedTextField(
+                    value = hydrationFactorInput,
+                    onValueChange = { raw ->
+                        hydrationFactorInput = VolumeConverter.sanitizeDecimalInput(raw)
+                        isFactorCustomized = true
+                    },
+                    label = { Text(stringResource(R.string.hydration_factor_label)) },
+                    suffix = { Text("x") },
+                    trailingIcon = if (abs(parsedFactor - selectedDrinkType.defaultHydrationFactor) > 0.001) {
+                        {
+                            TextButton(
+                                onClick = {
+                                    hydrationFactorInput = VolumeConverter.formatHydrationFactor(
+                                        selectedDrinkType.defaultHydrationFactor
+                                    )
+                                    isFactorCustomized = false
+                                }
+                            ) {
+                                Text(stringResource(R.string.action_reset))
+                            }
+                        }
+                    } else null,
+                    singleLine = true,
+                    isError = !isFactorValid,
+                    supportingText = if (!isFactorValid) {
+                        { Text(stringResource(R.string.hydration_factor_error)) }
+                    } else null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -376,14 +432,14 @@ fun PresetEditorDialog(
                             volumeMl = ml,
                             iconKey = selectedIcon.id,
                             drinkType = selectedDrinkType.id,
-                            hydrationFactor = selectedDrinkType.defaultHydrationFactor,
+                            hydrationFactor = parsedFactor,
                             colorHex = selectedColorHex
                         ) ?: PresetEntity(
                             id = UUID.randomUUID().toString(),
                             label = labelInput.trim(),
                             volumeMl = ml,
                             iconKey = selectedIcon.id,
-                            hydrationFactor = selectedDrinkType.defaultHydrationFactor,
+                            hydrationFactor = parsedFactor,
                             displayOrder = nextDisplayOrder,
                             drinkType = selectedDrinkType.id,
                             colorHex = selectedColorHex

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CalendarToday
@@ -29,6 +30,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,11 +51,13 @@ import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.ui.common.DateTimePickerDialog
 import com.fillmark.app.ui.common.UnitToggle
+import kotlin.math.abs
 
 @Composable
 fun EditLogDialog(
     record: HydrationRecordEntity,
     displayUnit: DisplayUnit,
+    hydrationFactorsEnabled: Boolean = true,
     onDismiss: () -> Unit,
     onSave: (HydrationRecordEntity) -> Unit,
     onDelete: (() -> Unit)? = null
@@ -68,12 +72,23 @@ fun EditLogDialog(
     var volumeInput by remember {
         mutableStateOf(VolumeConverter.formatInputNumber(record.volumeMl, displayUnit))
     }
+    var labelInput by remember { mutableStateOf(record.label.orEmpty()) }
     var selectedDrinkType by remember { mutableStateOf(DrinkType.fromId(record.drinkType)) }
+    var hydrationFactorInput by remember {
+        mutableStateOf(VolumeConverter.formatHydrationFactor(record.hydrationFactor))
+    }
     var selectedTimestamp by remember { mutableStateOf(record.timestamp) }
     var showDateTimePicker by remember { mutableStateOf(false) }
 
     val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
     val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
+    val parsedFactor = hydrationFactorInput.toDoubleOrNull() ?: 0.0
+    val isFactorValid = !hydrationFactorsEnabled || VolumeConverter.isValidHydrationFactor(parsedFactor)
+    val activeFactor = if (hydrationFactorsEnabled) {
+        if (isFactorValid) parsedFactor else record.hydrationFactor
+    } else {
+        record.hydrationFactor
+    }
     val isVolumeValid = ml > 0 && ml <= VolumeConverter.MAX_SINGLE_DRINK_ML
     val volumeErrorText = when {
         volumeInput.isBlank() || ml <= 0 -> stringResource(R.string.error_volume_gt_zero)
@@ -94,7 +109,11 @@ fun EditLogDialog(
             )
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -131,6 +150,17 @@ fun EditLogDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = labelInput,
+                    onValueChange = { labelInput = it },
+                    label = { Text(stringResource(R.string.drink_name_optional_label)) },
+                    placeholder = { Text(stringResource(R.string.drink_name_placeholder)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
@@ -150,10 +180,48 @@ fun EditLogDialog(
                     DrinkType.entries.forEach { type ->
                         FilterChip(
                             selected = type == selectedDrinkType,
-                            onClick = { selectedDrinkType = type },
+                            onClick = {
+                                if (type != selectedDrinkType) {
+                                    selectedDrinkType = type
+                                    hydrationFactorInput = VolumeConverter.formatHydrationFactor(
+                                        type.defaultHydrationFactor
+                                    )
+                                }
+                            },
                             label = { Text(type.displayName) }
                         )
                     }
+                }
+
+                if (hydrationFactorsEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = hydrationFactorInput,
+                        onValueChange = { hydrationFactorInput = VolumeConverter.sanitizeDecimalInput(it) },
+                        label = { Text(stringResource(R.string.hydration_factor_label)) },
+                        suffix = { Text("x") },
+                        trailingIcon = if (abs(parsedFactor - selectedDrinkType.defaultHydrationFactor) > 0.001) {
+                            {
+                                TextButton(
+                                    onClick = {
+                                        hydrationFactorInput = VolumeConverter.formatHydrationFactor(
+                                            selectedDrinkType.defaultHydrationFactor
+                                        )
+                                    }
+                                ) {
+                                    Text(stringResource(R.string.action_reset))
+                                }
+                            }
+                        } else null,
+                        singleLine = true,
+                        isError = !isFactorValid,
+                        supportingText = if (!isFactorValid) {
+                            { Text(stringResource(R.string.hydration_factor_error)) }
+                        } else null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -214,18 +282,19 @@ fun EditLogDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (isVolumeValid) {
+                    if (isVolumeValid && isFactorValid) {
                         onSave(
                             record.copy(
                                 volumeMl = ml,
-                                hydrationFactor = selectedDrinkType.defaultHydrationFactor,
+                                hydrationFactor = activeFactor,
                                 drinkType = selectedDrinkType.id,
-                                timestamp = selectedTimestamp
+                                timestamp = selectedTimestamp,
+                                label = labelInput.trim().ifBlank { null }
                             )
                         )
                     }
                 },
-                enabled = isVolumeValid
+                enabled = isVolumeValid && isFactorValid
             ) {
                 Text(stringResource(R.string.action_save))
             }

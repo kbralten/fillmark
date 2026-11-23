@@ -38,7 +38,8 @@ class QuickLogActionCallback : ActionCallback {
             hydrationFactor = preset.hydrationFactor,
             drinkType = preset.drinkType,
             iconKey = preset.iconKey,
-            lastModified = now
+            lastModified = now,
+            label = preset.label
         )
         database.hydrationDao().insertRecord(record)
 

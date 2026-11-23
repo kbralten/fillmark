@@ -5,11 +5,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
@@ -44,7 +44,6 @@ import com.fillmark.app.data.local.FillmarkDatabase
 import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.domain.PacingCalculator
 import com.fillmark.app.domain.PacingResult
-import com.fillmark.app.domain.PacingStatus
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -97,6 +96,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
                 280
             }
 
+            val isDark = resolveWidgetIsDark(context, prefs.themeMode)
             val effectiveTotalMl = todayRecords.sumOf { it.countedVolumeMl(prefs.hydrationFactorsEnabled) }
             val targetMl = targetEntity?.targetMl ?: prefs.defaultDailyTargetMl
             val hasTarget = targetMl > 0
@@ -117,24 +117,31 @@ class ProgressMeterWidget : GlanceAppWidget() {
             }
 
             val paceRatio = if (pacing != null) (pacing.targetPacingPercent / 100f) else null
-            val progressBitmap = remember(rawRatio, paceRatio, barWidthDp) {
+            val progressBitmap = remember(rawRatio, paceRatio, barWidthDp, isDark) {
                 WidgetProgressBarGenerator.createProgressBarBitmap(
                     context = context,
                     progress = rawRatio,
                     paceRatio = paceRatio,
                     widthDp = barWidthDp,
-                    heightDp = 18
+                    heightDp = 18,
+                    isDark = isDark
                 )
             }
 
-            ProgressMeterContent(
-                hasTarget = hasTarget,
-                consumedText = VolumeConverter.formatVolume(effectiveTotalMl, prefs.displayUnit),
-                targetText = VolumeConverter.formatVolume(targetMl, prefs.displayUnit),
-                progressBitmap = progressBitmap,
-                percentDisplay = percentDisplay,
-                pacing = pacing
-            )
+            FillmarkWidgetTheme(
+                themeMode = prefs.themeMode,
+                dynamicColor = prefs.dynamicColorEnabled
+            ) {
+                ProgressMeterContent(
+                    hasTarget = hasTarget,
+                    consumedText = VolumeConverter.formatVolume(effectiveTotalMl, prefs.displayUnit),
+                    targetText = VolumeConverter.formatVolume(targetMl, prefs.displayUnit),
+                    progressBitmap = progressBitmap,
+                    percentDisplay = percentDisplay,
+                    pacing = pacing,
+                    isDark = isDark
+                )
+            }
         }
     }
 
@@ -145,18 +152,18 @@ class ProgressMeterWidget : GlanceAppWidget() {
         targetText: String,
         progressBitmap: android.graphics.Bitmap,
         percentDisplay: Int,
-        pacing: PacingResult?
+        pacing: PacingResult?,
+        isDark: Boolean
     ) {
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(ColorProvider(Color(0xF0182432)))
+                .background(GlanceTheme.colors.widgetBackground)
                 .cornerRadius(22.dp)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
                 .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.Vertical.CenterVertically
         ) {
-            // Top Row: Title + Percentage
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Vertical.CenterVertically
@@ -166,7 +173,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
                     style = TextStyle(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ColorProvider(Color.White)
+                        color = GlanceTheme.colors.onSurface
                     )
                 )
                 Spacer(modifier = GlanceModifier.defaultWeight())
@@ -175,14 +182,13 @@ class ProgressMeterWidget : GlanceAppWidget() {
                     style = TextStyle(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ColorProvider(Color.White)
+                        color = GlanceTheme.colors.onSurface
                     )
                 )
             }
 
             Spacer(modifier = GlanceModifier.height(6.dp))
 
-            // Center Luminous Progress Bar
             Image(
                 provider = ImageProvider(progressBitmap),
                 contentDescription = "Progress: $percentDisplay%",
@@ -192,7 +198,6 @@ class ProgressMeterWidget : GlanceAppWidget() {
 
             Spacer(modifier = GlanceModifier.height(6.dp))
 
-            // Bottom Row: Volume consumed / target + Pacing status pill
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Vertical.CenterVertically
@@ -202,30 +207,14 @@ class ProgressMeterWidget : GlanceAppWidget() {
                     style = TextStyle(
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = ColorProvider(Color(0xFF9EAFBF))
+                        color = GlanceTheme.colors.onSurfaceVariant
                     )
                 )
 
                 Spacer(modifier = GlanceModifier.defaultWeight())
 
                 if (hasTarget && pacing != null) {
-                    val (pillBg, textColor, dotColor) = when (pacing.status) {
-                        PacingStatus.BEHIND -> Triple(
-                            Color(0xFF3F1F1E),
-                            Color(0xFFFF9B8A),
-                            Color(0xFFFF7A60)
-                        )
-                        PacingStatus.ON_TRACK -> Triple(
-                            Color(0xFF143B38),
-                            Color(0xFF7DE6C0),
-                            Color(0xFF2DD4BF)
-                        )
-                        PacingStatus.AHEAD -> Triple(
-                            Color(0xFF173D26),
-                            Color(0xFF86EFAC),
-                            Color(0xFF4ADE80)
-                        )
-                    }
+                    val (pillBg, textColor, dotColor) = getAdaptivePacingColors(pacing.status, isDark)
 
                     Box(
                         modifier = GlanceModifier

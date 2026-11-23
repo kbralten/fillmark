@@ -1,8 +1,13 @@
 package com.fillmark.app.ui.dashboard.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -20,13 +25,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.VolumeConverter
+import com.fillmark.app.domain.GoalMilestoneTracker
 import com.fillmark.app.domain.PacingResult
 import com.fillmark.app.domain.PacingStatus
 import com.fillmark.app.ui.theme.FillmarkCyan
@@ -90,6 +101,22 @@ fun FluidProgressMeter(
     onTargetClick: (() -> Unit)? = null
 ) {
     val hasTarget = targetMl > 0
+    val goalReached = GoalMilestoneTracker.isGoalReached(effectiveVolumeMl, targetMl)
+    var previousVolumeMl by remember { mutableDoubleStateOf(effectiveVolumeMl) }
+    val celebrationPulse = remember { Animatable(0f) }
+
+    LaunchedEffect(effectiveVolumeMl, targetMl) {
+        if (GoalMilestoneTracker.didCrossDailyGoal(previousVolumeMl, effectiveVolumeMl, targetMl)) {
+            celebrationPulse.snapTo(0f)
+            celebrationPulse.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
+            )
+            celebrationPulse.snapTo(0f)
+        }
+        previousVolumeMl = effectiveVolumeMl
+    }
+
     val progressRatio = if (hasTarget) (effectiveVolumeMl / targetMl).toFloat() else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progressRatio.coerceIn(0f, 2f),
@@ -273,6 +300,18 @@ fun FluidProgressMeter(
                             style = Stroke(width = strokeWidth + 3.dp.toPx(), cap = StrokeCap.Round)
                         )
                     }
+
+                    // One-shot celebration burst ring when crossing 100%
+                    val pulse = celebrationPulse.value
+                    if (pulse > 0f && pulse < 1f) {
+                        val burstRadius = radius + (14.dp.toPx() * pulse)
+                        drawCircle(
+                            color = FillmarkCyan.copy(alpha = (1f - pulse) * 0.55f),
+                            radius = burstRadius,
+                            center = centerOffset,
+                            style = Stroke(width = (6.dp.toPx() * (1f - pulse)).coerceAtLeast(1f))
+                        )
+                    }
                 }
             }
 
@@ -380,6 +419,38 @@ fun FluidProgressMeter(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = goalReached,
+            enter = fadeIn() + scaleIn(initialScale = 0.85f),
+            exit = fadeOut()
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = if (isDark) PaceAheadBgDark else PaceAheadBg,
+                border = BorderStroke(1.dp, if (isDark) PaceAheadBorderDark else PaceAheadBorder),
+                modifier = Modifier.padding(top = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.EmojiEvents,
+                        contentDescription = null,
+                        tint = if (isDark) PaceAheadIconDark else PaceAheadIcon,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.meter_goal_reached_badge),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) PaceAheadTextDark else PaceAheadText
+                    )
                 }
             }
         }

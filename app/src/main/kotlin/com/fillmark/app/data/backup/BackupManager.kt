@@ -44,7 +44,8 @@ data class BackupRecord(
     val hydrationFactor: Double = 1.0,
     val drinkType: String = "WATER",
     val iconKey: String? = null,
-    val lastModified: Long = 0L
+    val lastModified: Long = 0L,
+    val label: String? = null
 )
 
 @Serializable
@@ -220,7 +221,8 @@ object BackupManager {
                     hydrationFactor = it.hydrationFactor,
                     drinkType = it.drinkType,
                     iconKey = it.iconKey,
-                    lastModified = it.lastModified
+                    lastModified = it.lastModified,
+                    label = it.label
                 )
             },
             presets = presets.map {
@@ -334,7 +336,8 @@ object BackupManager {
                 iconKey = it.iconKey,
                 healthConnectId = null,
                 lastModified = if (it.lastModified > 0L) it.lastModified else nowMillis,
-                lastSynced = 0L
+                lastSynced = 0L,
+                label = it.label?.trim()?.takeIf { lbl -> lbl.isNotBlank() }
             )
         }
         val presetEntities = if (backup.presets.isNotEmpty()) {

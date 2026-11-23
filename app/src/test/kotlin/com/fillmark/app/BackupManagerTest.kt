@@ -35,7 +35,8 @@ class BackupManagerTest {
                     hydrationFactor = 0.85,
                     drinkType = "COFFEE",
                     iconKey = "MUG",
-                    lastModified = 1700000002000L
+                    lastModified = 1700000002000L,
+                    label = "Morning Coffee"
                 )
             ),
             presets = listOf(
@@ -217,5 +218,29 @@ class BackupManagerTest {
             UserPreferencesRepository.hasHealthConnectChangesToken(prefs)
         )
         assertEquals(0L, UserPreferencesRepository.lastHealthConnectSyncMillis(prefs))
+    }
+
+    @Test
+    fun decodeBackupJson_handlesLegacyBackupWithoutRecordLabel() {
+        val legacyJson = """
+            {
+              "schemaVersion": 1,
+              "exportedAtMillis": 1700000000000,
+              "records": [
+                {
+                  "id": "r1",
+                  "timestamp": 1700000001000,
+                  "volumeMl": 250.0,
+                  "hydrationFactor": 1.0,
+                  "drinkType": "WATER"
+                }
+              ],
+              "presets": [],
+              "dailyTargets": [],
+              "preferences": {}
+            }
+        """.trimIndent()
+        val decoded = BackupManager.decodeBackupJson(legacyJson)
+        assertEquals(null, decoded.records.first().label)
     }
 }

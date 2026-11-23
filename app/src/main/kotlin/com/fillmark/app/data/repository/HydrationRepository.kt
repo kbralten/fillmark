@@ -169,7 +169,8 @@ class HydrationRepository internal constructor(
             hydrationFactor = preset.hydrationFactor,
             drinkType = preset.drinkType,
             iconKey = preset.iconKey,
-            lastModified = System.currentTimeMillis()
+            lastModified = System.currentTimeMillis(),
+            label = preset.label
         )
         insertRecord(record)
         return record

@@ -12,6 +12,22 @@ object VolumeConverter {
     const val ML_PER_FL_OZ = 29.5735
     const val MAX_SINGLE_DRINK_ML = 10_000.0
     const val MAX_DAILY_TARGET_ML = 20_000.0
+    const val MIN_HYDRATION_FACTOR = 0.1
+    const val MAX_HYDRATION_FACTOR = 2.0
+
+    fun isValidHydrationFactor(factor: Double): Boolean {
+        return factor.isFinite() && factor in MIN_HYDRATION_FACTOR..MAX_HYDRATION_FACTOR
+    }
+
+    fun formatHydrationFactor(factor: Double): String {
+        val rounded = (factor * 100.0).roundToInt() / 100.0
+        val raw = String.format(Locale.US, "%.2f", rounded)
+        return if (raw.endsWith("0") && !raw.endsWith(".0")) {
+            raw.dropLast(1)
+        } else {
+            raw
+        }
+    }
 
     /**
      * Filters raw user text to digits and at most one decimal point.

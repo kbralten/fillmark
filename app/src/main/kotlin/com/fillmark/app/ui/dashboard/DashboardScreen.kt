@@ -45,6 +45,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,7 +56,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -67,10 +70,12 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
+import com.fillmark.app.core.DrinkType
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
+import com.fillmark.app.domain.GoalMilestoneTracker
 import com.fillmark.app.ui.common.UnitToggle
 import com.fillmark.app.ui.dashboard.components.CustomizePresetsDialog
 import com.fillmark.app.ui.dashboard.components.FluidProgressMeter
@@ -94,6 +99,15 @@ fun DashboardScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val undoActionLabel = stringResource(R.string.action_undo)
+    val haptic = LocalHapticFeedback.current
+    var previousEffectiveMl by remember { mutableDoubleStateOf(uiState.effectiveVolumeMl) }
+
+    LaunchedEffect(uiState.effectiveVolumeMl, uiState.targetMl) {
+        if (GoalMilestoneTracker.didCrossDailyGoal(previousEffectiveMl, uiState.effectiveVolumeMl, uiState.targetMl)) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+        previousEffectiveMl = uiState.effectiveVolumeMl
+    }
 
     LaunchedEffect(pendingShortcutPresetId, pendingOpenManualLog) {
         if (pendingShortcutPresetId != null) {
@@ -285,8 +299,9 @@ fun DashboardScreen(
                 displayUnit = uiState.displayUnit,
                 hydrationFactorsEnabled = uiState.hydrationFactorsEnabled,
                 onDismiss = { viewModel.closeManualLogSheet() },
-                onLogRecord = { volume, factor, drinkType, timestamp ->
-                    viewModel.logCustom(volume, factor, drinkType, timestamp)
+                onLogRecord = { volume, factor, drinkType, timestamp, label ->
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.logCustom(volume, factor, drinkType, timestamp, label)
                 },
                 sheetState = sheetState
             )
@@ -320,6 +335,7 @@ fun DashboardScreen(
             EditLogDialog(
                 record = recordToEdit,
                 displayUnit = uiState.displayUnit,
+                hydrationFactorsEnabled = uiState.hydrationFactorsEnabled,
                 onDismiss = { viewModel.dismissEditingRecord() },
                 onSave = { updated -> viewModel.saveEditedRecord(updated) },
                 onDelete = { viewModel.deleteRecord(recordToEdit) }
@@ -592,14 +608,21 @@ private fun TodayLogItem(
             }
 
             Column(modifier = Modifier.padding(start = 12.dp)) {
+                val title = record.displayTitle()
+                val categoryName = DrinkType.fromId(record.drinkType).displayName
+                val timeText = TimeUtils.formatTime(record.timestamp, is24Hour = is24Hour)
                 Text(
-                    text = record.drinkType.lowercase().replaceFirstChar { it.uppercase() },
+                    text = title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = TimeUtils.formatTime(record.timestamp, is24Hour = is24Hour),
+                    text = if (!record.label.isNullOrBlank() && !record.label.equals(categoryName, ignoreCase = true)) {
+                        stringResource(R.string.history_type_and_time, categoryName, timeText)
+                    } else {
+                        timeText
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

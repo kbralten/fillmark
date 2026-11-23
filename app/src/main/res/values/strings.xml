@@ -273,4 +273,44 @@
     <string name="onboarding_hc_prompt">Sync hydration records with other fitness apps on your device.</string>
     <string name="onboarding_hc_connect">Connect Health Connect</string>
     <string name="onboarding_get_started">Get Started</string>
+
+    <!-- Custom Hydration Factor & Drink Name -->
+    <string name="drink_name_optional_label">Drink Name (optional)</string>
+    <string name="drink_name_placeholder">e.g. Morning Matcha, Stanley 40oz</string>
+    <string name="hydration_factor_label">Hydration Factor</string>
+    <string name="hydration_factor_error">Enter a factor between 0.1x and 2.0x</string>
+    <string name="action_reset">Reset</string>
+    <string name="history_type_and_time">%1$s · %2$s</string>
+
+    <!-- History Search, Filtering, Quick-Add, Swipe-to-Delete -->
+    <string name="history_search_hint">Search drinks or volumes…</string>
+    <string name="history_clear_search_cd">Clear search</string>
+    <string name="history_filter_date_cd">Filter by date</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_no_matches">No drink logs match your current filters.</string>
+    <string name="history_clear_filters">Clear Filters</string>
+    <string name="history_add_drink_cd">Log past or current drink</string>
+    <string name="history_delete_confirm_title">Delete Drink Entry?</string>
+    <string name="history_delete_confirm_body">Remove %1$s (%2$s) from your log history?</string>
+    <string name="action_delete">Delete</string>
+
+    <!-- Daily Goal Estimator -->
+    <string name="estimator_button">Estimate starting goal</string>
+    <string name="estimator_title">Daily Goal Estimator</string>
+    <string name="estimator_subtitle">Get a rough starting target based on body weight and activity level.</string>
+    <string name="estimator_weight_label">Body Weight</string>
+    <string name="estimator_weight_kg">kg</string>
+    <string name="estimator_weight_lb">lb</string>
+    <string name="estimator_weight_error">Enter a valid weight</string>
+    <string name="estimator_activity_label">Activity Level</string>
+    <string name="estimator_activity_low">Low</string>
+    <string name="estimator_activity_moderate">Moderate</string>
+    <string name="estimator_activity_high">Active</string>
+    <string name="estimator_warm_climate">Warm or dry climate (+300 ml)</string>
+    <string name="estimator_result_label">Suggested Starting Target</string>
+    <string name="estimator_disclaimer">General wellness estimate only — not medical advice. Adjust anytime to fit your needs.</string>
+    <string name="estimator_use_estimate">Use Estimate</string>
+
+    <!-- Habit-Loop Celebration -->
+    <string name="meter_goal_reached_badge">Goal Reached!</string>
 </resources>

@@ -79,6 +79,7 @@ import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.ThemeMode
 import com.fillmark.app.sync.HealthConnectManager
+import com.fillmark.app.ui.common.DailyGoalEstimatorDialog
 import java.time.LocalDate
 import java.util.Locale
 
@@ -206,6 +207,7 @@ fun SettingsScreen(
 
     var showWakeTimePicker by remember { mutableStateOf(false) }
     var showSleepTimePicker by remember { mutableStateOf(false) }
+    var showEstimatorDialog by remember { mutableStateOf(false) }
 
     val privacyUrl = stringResource(R.string.privacy_policy_url)
     val githubIssuesUrl = stringResource(R.string.github_issues_url)
@@ -415,6 +417,13 @@ fun SettingsScreen(
                                     targetFieldWasFocused = focusState.isFocused
                                 }
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(
+                            onClick = { showEstimatorDialog = true },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text(stringResource(R.string.estimator_button))
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -905,6 +914,20 @@ fun SettingsScreen(
             onConfirm = { newTime ->
                 viewModel.setWakingSchedule(uiState.wakingHoursStart, newTime, uiState.wakingPacingEnabled)
                 showSleepTimePicker = false
+            }
+        )
+    }
+
+    if (showEstimatorDialog) {
+        DailyGoalEstimatorDialog(
+            displayUnit = uiState.displayUnit,
+            onDismiss = { showEstimatorDialog = false },
+            onApplyEstimateMl = { estimatedMl ->
+                targetInputState.setDisplayText(
+                    VolumeConverter.formatInputNumber(estimatedMl, uiState.displayUnit)
+                )
+                viewModel.setDefaultTargetMl(estimatedMl)
+                showEstimatorDialog = false
             }
         )
     }
