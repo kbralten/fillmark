@@ -22,15 +22,15 @@ Fillmark is designed to make drink tracking effortless and friction-free. With o
 
 ### 💧 Fast & Flexible Logging
 - **One-Tap Presets:** Instantly record drinks using preset containers (e.g., Glass, Coffee Mug, Water Bottle, Can, Tumbler).
-- **Custom Presets:** Tailor presets with custom labels, container icons, fluid volumes, drink categories, and colors.
-- **Drink Hydration Factors:** Account for beverages with different water retention properties (e.g., water vs. coffee or tea), with a global toggle in Settings to count 1:1 raw volume instead.
-- **Manual Logging:** Floating action button allows quick logging of arbitrary amounts, beverage types, and custom past timestamps.
+- **Custom Presets & Labels:** Tailor presets with custom labels, container icons, fluid volumes, drink categories, and colors; custom preset and manual drink labels are preserved across logs, history, and JSON backups.
+- **Custom Hydration Factors:** Account for beverages with different hydration efficiency (e.g., water vs. coffee or tea) with customizable multipliers (`0.1x–2.0x`), plus a global toggle in Settings to count 1:1 raw volume instead.
+- **Manual Logging:** Floating action button allows quick logging of arbitrary amounts, custom names, beverage types, and past timestamps.
 - **Quick Settings Tile & App Shortcuts:** Log your top preset directly from Android's Quick Settings shade or long-press launcher shortcuts.
 - **Instant Undo:** 4-second quick undo snackbar prevents accidental entries.
 
 ### ⏱️ Daily Dashboard & Waking Hours Pacing
-- **First-Run Onboarding:** Guided 3-step setup with locale-aware unit defaults, daily goal selection, waking window, and optional Health Connect connection (automatically skipped for existing users).
-- **Real-Time Progress:** High-contrast progress meter displaying daily intake against your target (or standalone consumption if no target is set).
+- **First-Run Onboarding & Goal Estimator:** Guided 3-step setup with locale-aware unit defaults, an optional weight/activity-based Daily Goal Estimator, waking window configuration, and optional Health Connect connection (automatically skipped for existing users).
+- **Real-Time Progress & Celebration:** High-contrast progress meter displaying daily intake against your target (or standalone consumption if no target is set), with haptic feedback and a "Goal Reached!" milestone highlight at 100%.
 - **Per-Day Goal Override:** Tap today's target on the Dashboard to adjust your goal for today only without altering past or future days.
 - **Adaptive Pacing Meter:** Calculates where your drinking level should be at any point in the day based on your wake-up and bedtime schedule, highlighting whether you are *ahead*, *on track*, or *behind*.
 - **Historical Target Preservation:** Adjusting your default target in Settings preserves past daily targets and historical compliance records.
@@ -42,9 +42,10 @@ Powered by Jetpack Glance, Fillmark provides three interactive home screen widge
 3. **Full Dashboard (4×2):** Combines the luminous progress bar and pacing status pill with your favorite preset buttons and quick Undo support.
 
 ### 📜 History & Record Management
-- Chronological day-by-day logs showing timestamps, drink types, container icons, and volumes.
-- Tap any record to edit its timestamp, beverage type, or volume.
-- One-tap delete with an instant Undo snackbar.
+- Chronological day-by-day logs showing timestamps, custom drink labels, beverage categories, container icons, and volumes.
+- Search by drink name/category and filter logs by drink type or calendar date.
+- Tap any record to edit its timestamp, drink name, beverage category, hydration factor, or volume (or delete directly from the edit dialog).
+- Swipe-to-delete (with confirmation dialog) or one-tap delete with an instant Undo snackbar.
 
 ### 📈 Historical Analytics & Charts
 - **Day:** Cumulative intake and hourly intake rate line charts with daily target and waking-hours pacing reference lines.
@@ -57,8 +58,9 @@ Powered by Jetpack Glance, Fillmark provides three interactive home screen widge
 - Inbound sync pulls hydration entries logged in other apps without creating duplicate records.
 - Works entirely on-device; toggle sync or revoke permissions at any time.
 
-### ⚙️ Personalization, Preferences & Local Data
-- Seamless switching between **Metric** (ml) and **Imperial** (fl oz). All data is stored in milliliters internally to prevent conversion drift.
+### ⚙️ Personalization, Localization & Local Data
+- Seamless switching between **Metric** (ml) and **Imperial** (fl oz) with locale-aware decimal formatting and comma/dot decimal input support. All data is stored in milliliters internally to prevent conversion drift.
+- **Languages:** Localized in English, Spanish (`es`), French (`fr`), and German (`de`) with Android per-app language support (`locales_config`).
 - **Appearance:** Light, Dark, and System theme modes with optional Material You dynamic color (Android 12+), full Edge-to-Edge support, and a responsive `NavigationRail` layout on tablets and foldables.
 - **Local Data Tools:** Export/restore full local JSON backups, export drink logs to CSV, or reset and clear all local data in Settings.
 
@@ -121,10 +123,15 @@ app/src/main/kotlin/com/fillmark/app/
      .\gradlew.bat assembleDebug
      ```
 
-4. **Run Unit Tests:**
-   ```bash
-   ./gradlew test
-   ```
+4. **Run Tests & Verification Checks:**
+   - **Unit, Room Migration & Robolectric UI Tests + Lint:**
+     ```bash
+     ./gradlew testDebugUnitTest compileDebugAndroidTestKotlin lintRelease
+     ```
+   - **Instrumented Tests (requires connected device or emulator):**
+     ```bash
+     ./gradlew connectedDebugAndroidTest
+     ```
 
 ---
 

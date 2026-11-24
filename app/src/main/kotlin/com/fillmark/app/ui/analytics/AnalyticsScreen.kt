@@ -452,8 +452,8 @@ private fun MetricCard(
     title: String,
     value: String,
     icon: ImageVector,
-    subtitle: String? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    subtitle: String? = null
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),

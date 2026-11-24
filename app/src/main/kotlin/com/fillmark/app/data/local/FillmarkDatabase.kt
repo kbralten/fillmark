@@ -3,6 +3,7 @@ package com.fillmark.app.data.local
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import androidx.annotation.VisibleForTesting
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -81,6 +82,14 @@ abstract class FillmarkDatabase : RoomDatabase() {
                     .build()
                 INSTANCE = instance
                 instance
+            }
+        }
+
+        @VisibleForTesting
+        internal fun resetInstanceForTesting() {
+            synchronized(this) {
+                INSTANCE?.close()
+                INSTANCE = null
             }
         }
 

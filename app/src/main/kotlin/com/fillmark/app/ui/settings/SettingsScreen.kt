@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.text.format.DateFormat
+import androidx.core.net.toUri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -863,7 +864,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, privacyUrl.toUri()))
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -873,7 +874,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(githubIssuesUrl)))
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, githubIssuesUrl.toUri()))
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -1002,7 +1003,7 @@ fun SettingsScreen(
                 OutlinedButton(
                     onClick = {
                         runCatching {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(githubRepoUrl)))
+                            context.startActivity(Intent(Intent.ACTION_VIEW, githubRepoUrl.toUri()))
                         }
                     }
                 ) {

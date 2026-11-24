@@ -1,5 +1,6 @@
 package com.fillmark.app.ui.dashboard.components
 
+import androidx.core.graphics.toColorInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -78,7 +79,7 @@ val PRESET_PALETTE = listOf(
 fun parseHexColor(hex: String?, fallback: Color = Color(0xFF2196F3)): Color {
     if (hex.isNullOrBlank()) return fallback
     return try {
-        Color(android.graphics.Color.parseColor(hex))
+        Color(hex.toColorInt())
     } catch (e: Exception) {
         fallback
     }

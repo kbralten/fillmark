@@ -2,8 +2,8 @@ package com.fillmark.app.sync
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.util.Log
+import androidx.core.net.toUri
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.changes.DeletionChange
 import androidx.health.connect.client.changes.UpsertionChange
@@ -259,7 +259,7 @@ class HealthConnectManager internal constructor(
         fun openPlayStore(context: Context) {
             val marketIntent = Intent(
                 Intent.ACTION_VIEW,
-                Uri.parse("market://details?id=com.google.android.apps.healthdata")
+                "market://details?id=com.google.android.apps.healthdata".toUri()
             ).apply {
                 setPackage("com.android.vending")
             }
@@ -269,7 +269,7 @@ class HealthConnectManager internal constructor(
                         context.startActivity(
                             Intent(
                                 Intent.ACTION_VIEW,
-                                Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata")
+                                "https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata".toUri()
                             )
                         )
                     }

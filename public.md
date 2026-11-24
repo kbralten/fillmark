@@ -1,19 +1,6 @@
 # Fillmark — Public Release Readiness Evaluation
 
-## 4. Testing, CI/CD & Documentation Hygiene
-
-### Testing & Release Verification
-- **No Room migration tests:** `3.json` schema is exported, but `1.json`/`2.json` and `androidx.room:room-testing` (`MigrationTestHelper`) are absent. Add automated migration tests before shipping schema v4+.
-- **Thin instrumented UI/integration coverage:** [MainScreenTest.kt](file:///c:/Users/kevin/Dev/fillmark/app/src/androidTest/kotlin/com/fillmark/app/ui/main/MainScreenTest.kt) only checks tab rendering/switching. Add instrumented or Robolectric tests covering Onboarding, quick-log + Undo, Edit/Delete, Settings target persistence, and Room-backed JSON Backup/Restore.
-
-### CI/CD & Lint Cleanup
-- **Fail fast on missing release signing secrets:** [release-aab.yml](file:///c:/Users/kevin/Dev/fillmark/.github/workflows/release-aab.yml#L41-L48) silently builds an **unsigned** AAB if `RELEASE_KEYSTORE_BASE64` is unset; fail the workflow on tagged releases when signing secrets are missing.
-- **Gate Firebase distribution on tests/lint:** [firebase-distribution.yml](file:///c:/Users/kevin/Dev/fillmark/.github/workflows/firebase-distribution.yml#L34-L35) pushes debug APKs on every commit to `main` without running `testDebugUnitTest` or `lintRelease`.
-- **Lint warnings:** `./gradlew lintRelease` currently passes with **0 errors, 74 warnings** (notably `UnsafeProtectedBroadcastReceiver`, `PluralsCandidate`, `ReportShortcutUsage`, `ModifierParameter`, `AutoboxingStateCreation`, `ObsoleteSdkInt`, `SmallSp`, and dependency updates).
-
----
-
-## 5. Google Play Console, Metadata & Legal Checklist (Off-Code)
+## Google Play Console, Metadata & Legal Checklist (Off-Code)
 
 1. **Developer Account & Testing Gate:**
    - Verify whether publishing with **Health Connect** requires a **Google Play Organization Account (D-U-N-S number)** vs. personal account for your chosen Health Apps subcategories.

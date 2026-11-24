@@ -1,5 +1,6 @@
 package com.fillmark.app.ui.dashboard.components
 
+import androidx.core.graphics.toColorInt
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -243,7 +244,7 @@ fun getBlendedTileColor(presetColor: Color): Color {
 fun parseHexColor(hex: String): Color {
     return try {
         val clean = hex.removePrefix("#")
-        Color(android.graphics.Color.parseColor("#$clean"))
+        Color("#$clean".toColorInt())
     } catch (_: Exception) {
         FillmarkCyan
     }

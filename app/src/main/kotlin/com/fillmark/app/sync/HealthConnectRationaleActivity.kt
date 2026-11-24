@@ -1,9 +1,9 @@
 package com.fillmark.app.sync
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.core.net.toUri
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -125,7 +125,7 @@ class HealthConnectRationaleActivity : ComponentActivity() {
                             OutlinedButton(
                                 onClick = {
                                     runCatching {
-                                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
+                                        startActivity(Intent(Intent.ACTION_VIEW, privacyUrl.toUri()))
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth()

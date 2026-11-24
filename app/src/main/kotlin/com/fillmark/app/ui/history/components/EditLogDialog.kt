@@ -33,12 +33,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -63,6 +65,7 @@ fun EditLogDialog(
     onDelete: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val is24Hour = DateFormat.is24HourFormat(context)
     val todayLabel = stringResource(R.string.today)
     val yesterdayLabel = stringResource(R.string.yesterday)
@@ -77,7 +80,7 @@ fun EditLogDialog(
     var hydrationFactorInput by remember {
         mutableStateOf(VolumeConverter.formatHydrationFactor(record.hydrationFactor))
     }
-    var selectedTimestamp by remember { mutableStateOf(record.timestamp) }
+    var selectedTimestamp by remember { mutableLongStateOf(record.timestamp) }
     var showDateTimePicker by remember { mutableStateOf(false) }
 
     val inputVal = VolumeConverter.parseDecimalInput(volumeInput) ?: 0.0
@@ -283,6 +286,7 @@ fun EditLogDialog(
             Button(
                 onClick = {
                     if (isVolumeValid && isFactorValid) {
+                        focusManager.clearFocus()
                         onSave(
                             record.copy(
                                 volumeMl = ml,

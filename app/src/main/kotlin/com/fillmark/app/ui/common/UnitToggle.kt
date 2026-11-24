@@ -18,9 +18,9 @@ import com.fillmark.app.core.DisplayUnit
 fun UnitToggle(
     selectedUnit: DisplayUnit,
     onUnitSelected: (DisplayUnit) -> Unit,
-    modifier: Modifier = Modifier.width(128.dp)
+    modifier: Modifier = Modifier
 ) {
-    SingleChoiceSegmentedButtonRow(modifier = modifier) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.width(128.dp).then(modifier)) {
         SegmentedButton(
             selected = selectedUnit == DisplayUnit.METRIC_ML,
             onClick = { onUnitSelected(DisplayUnit.METRIC_ML) },

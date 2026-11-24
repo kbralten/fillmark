@@ -35,17 +35,49 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Run Unit Tests and Release Lint
-        run: ./gradlew testDebugUnitTest lintRelease --no-daemon
+      - name: Run Unit Tests, AndroidTest Compile, and Release Lint
+        run: ./gradlew testDebugUnitTest compileDebugAndroidTestKotlin lintRelease --no-daemon
 
-      - name: Decode Release Keystore (if configured)
+      - name: Validate and Decode Release Keystore
+        id: signing
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "${{ runner.temp }}/release.keystore"
-            echo "RELEASE_STORE_FILE=${{ runner.temp }}/release.keystore" >> "$GITHUB_ENV"
+          is_tag=false
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            is_tag=true
           fi
+
+          missing=()
+          [ -z "$RELEASE_KEYSTORE_BASE64" ] && missing+=("RELEASE_KEYSTORE_BASE64")
+          [ -z "$RELEASE_STORE_PASSWORD" ] && missing+=("RELEASE_STORE_PASSWORD")
+          [ -z "$RELEASE_KEY_ALIAS" ] && missing+=("RELEASE_KEY_ALIAS")
+          [ -z "$RELEASE_KEY_PASSWORD" ] && missing+=("RELEASE_KEY_PASSWORD")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            if [ "$is_tag" = true ]; then
+              echo "::error::Tagged release builds require all signing secrets. Missing: ${missing[*]}"
+              exit 1
+            elif [ "${#missing[@]}" -lt 4 ]; then
+              echo "::error::Partial release signing configuration detected. Missing: ${missing[*]}"
+              exit 1
+            else
+              echo "No signing secrets configured for manual workflow_dispatch; building unsigned verification bundle."
+              echo "require_signing=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "${{ runner.temp }}/release.keystore"
+          if [ ! -s "${{ runner.temp }}/release.keystore" ]; then
+            echo "::error::Decoded release keystore is empty."
+            exit 1
+          fi
+          echo "RELEASE_STORE_FILE=${{ runner.temp }}/release.keystore" >> "$GITHUB_ENV"
+          echo "require_signing=true" >> "$GITHUB_OUTPUT"
 
       - name: Determine Version Properties
         id: version
@@ -70,6 +102,7 @@ jobs:
           ./gradlew bundleRelease
           -PversionCode=${{ steps.version.outputs.code }}
           -PversionName=${{ steps.version.outputs.name }}
+          -PrequireReleaseSigning=${{ steps.signing.outputs.require_signing }}
           --no-daemon
 
       - name: Upload AAB and R8 Mapping
