@@ -192,7 +192,7 @@ fun SettingsScreen(
     }
 
     val targetInput = targetInputState.text
-    val parsedTarget = targetInput.toDoubleOrNull() ?: 0.0
+    val parsedTarget = VolumeConverter.parseDecimalInput(targetInput) ?: 0.0
     val targetInternalMl = VolumeConverter.toInternalMl(parsedTarget, uiState.displayUnit)
     val targetErrorText = when {
         !hasTarget -> null
@@ -259,7 +259,7 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = uiState.themeMode == mode,
                                 onClick = { viewModel.setThemeMode(mode) },
-                                label = { Text(mode.label) }
+                                label = { Text(stringResource(mode.labelRes)) }
                             )
                         }
                     }

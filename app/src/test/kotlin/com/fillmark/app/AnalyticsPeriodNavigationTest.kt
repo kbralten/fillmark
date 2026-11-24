@@ -143,5 +143,58 @@ class AnalyticsPeriodNavigationTest {
         // Average target for the week = (6 * 2000 + 1500) / 7
         assertEquals((6 * 2000.0 + 1500.0) / 7.0, summary.bars[0].targetMl, 0.01)
     }
+
+    @Test
+    fun `52-week multi-week summary aggregates ~5000 records accurately`() {
+        val zone = java.time.ZoneId.of("UTC")
+        val today = java.time.LocalDate.of(2026, 11, 22) // Sunday -> exact 52-week alignment
+        val numWeeks = 52
+        val totalDays = numWeeks * 7 // 364 days
+        val startDate = today.minusDays((totalDays - 1).toLong())
+
+        // Generate 14 records per day (~5,096 records total): alternating 150ml and 160ml -> 2170ml/day on even days, 14*100=1400ml on odd days
+        val records = ArrayList<com.fillmark.app.data.local.entity.HydrationRecordEntity>(totalDays * 14)
+        var expectedTotalMl = 0.0
+        var expectedGoalMetDays = 0
+        for (dayIdx in 0 until totalDays) {
+            val date = startDate.plusDays(dayIdx.toLong())
+            val isGoalMetDay = dayIdx % 2 == 0
+            val perRecordMl = if (isGoalMetDay) 155.0 else 100.0 // 14 * 155 = 2170 >= 2000; 14 * 100 = 1400 < 2000
+            if (isGoalMetDay) expectedGoalMetDays++
+            val baseMillis = date.atStartOfDay(zone).toInstant().toEpochMilli()
+            for (r in 0 until 14) {
+                records.add(
+                    com.fillmark.app.data.local.entity.HydrationRecordEntity(
+                        id = "rec-$dayIdx-$r",
+                        timestamp = baseMillis + (r + 1) * 3_600_000L,
+                        volumeMl = perRecordMl,
+                        hydrationFactor = 1.0,
+                        drinkType = "WATER"
+                    )
+                )
+                expectedTotalMl += perRecordMl
+            }
+        }
+
+        val summary = com.fillmark.app.ui.analytics.AnalyticsViewModel.computeMultiWeekSummary(
+            records = records,
+            numWeeks = numWeeks,
+            offset = 0,
+            today = today,
+            zoneId = zone,
+            defaultTargetMl = 2000.0,
+            allTargetsMap = emptyMap(),
+            hydrationFactorsEnabled = true
+        )
+
+        assertEquals(totalDays, summary.totalDays)
+        assertEquals(expectedGoalMetDays, summary.daysGoalMet)
+        assertEquals(expectedTotalMl, summary.totalVolumeMl, 0.01)
+        assertEquals(expectedTotalMl / totalDays.toDouble(), summary.averageDailyVolumeMl, 0.01)
+        assertEquals(numWeeks, summary.bars.size)
+        summary.bars.forEach { bar ->
+            assertEquals(2000.0, bar.targetMl, 0.01)
+        }
+    }
 }
 

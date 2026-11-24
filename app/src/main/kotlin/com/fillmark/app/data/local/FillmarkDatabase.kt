@@ -8,6 +8,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.fillmark.app.R
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.data.local.dao.DailyTargetDao
 import com.fillmark.app.data.local.dao.HydrationDao
@@ -67,19 +68,75 @@ abstract class FillmarkDatabase : RoomDatabase() {
         }
 
         fun getInstance(context: Context): FillmarkDatabase {
+            val appContext = context.applicationContext
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                    appContext,
                     FillmarkDatabase::class.java,
                     "fillmark_database"
                 )
-                    .addCallback(DatabaseCallback())
+                    .addCallback(DatabaseCallback(appContext))
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration(false)
                     .build()
                 INSTANCE = instance
                 instance
             }
+        }
+
+        fun defaultPresets(context: Context): List<PresetEntity> {
+            return listOf(
+                PresetEntity(
+                    id = UUID.randomUUID().toString(),
+                    label = context.getString(R.string.preset_default_glass),
+                    volumeMl = 250.0,
+                    iconKey = PresetIcon.GLASS.id,
+                    hydrationFactor = 1.0,
+                    displayOrder = 0,
+                    drinkType = "WATER",
+                    colorHex = "#2196F3"
+                ),
+                PresetEntity(
+                    id = UUID.randomUUID().toString(),
+                    label = context.getString(R.string.preset_default_coffee_mug),
+                    volumeMl = 350.0,
+                    iconKey = PresetIcon.MUG.id,
+                    hydrationFactor = 0.85,
+                    displayOrder = 1,
+                    drinkType = "COFFEE",
+                    colorHex = "#795548"
+                ),
+                PresetEntity(
+                    id = UUID.randomUUID().toString(),
+                    label = context.getString(R.string.preset_default_water_bottle),
+                    volumeMl = 500.0,
+                    iconKey = PresetIcon.WATER_BOTTLE.id,
+                    hydrationFactor = 1.0,
+                    displayOrder = 2,
+                    drinkType = "WATER",
+                    colorHex = "#03A9F4"
+                ),
+                PresetEntity(
+                    id = UUID.randomUUID().toString(),
+                    label = context.getString(R.string.preset_default_tumbler),
+                    volumeMl = 750.0,
+                    iconKey = PresetIcon.TUMBLER.id,
+                    hydrationFactor = 0.90,
+                    displayOrder = 3,
+                    drinkType = "TEA",
+                    colorHex = "#4CAF50"
+                ),
+                PresetEntity(
+                    id = UUID.randomUUID().toString(),
+                    label = context.getString(R.string.preset_default_large_bottle),
+                    volumeMl = 1000.0,
+                    iconKey = PresetIcon.WATER_BOTTLE.id,
+                    hydrationFactor = 1.0,
+                    displayOrder = 4,
+                    drinkType = "WATER",
+                    colorHex = "#00BCD4"
+                )
+            )
         }
 
         val DEFAULT_PRESETS = listOf(
@@ -135,10 +192,10 @@ abstract class FillmarkDatabase : RoomDatabase() {
             )
         )
 
-        private class DatabaseCallback : RoomDatabase.Callback() {
+        private class DatabaseCallback(private val appContext: Context) : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                DEFAULT_PRESETS.forEach { preset ->
+                defaultPresets(appContext).forEach { preset ->
                     val values = ContentValues().apply {
                         put("id", preset.id)
                         put("label", preset.label)

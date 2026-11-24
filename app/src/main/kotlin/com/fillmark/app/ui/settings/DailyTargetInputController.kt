@@ -38,7 +38,7 @@ internal class DailyTargetInputState(
         savedTargetMl: Double,
         onCommit: (Double) -> Unit
     ): Boolean {
-        val num = text.toDoubleOrNull() ?: return false
+        val num = VolumeConverter.parseDecimalInput(text) ?: return false
         val ml = VolumeConverter.toInternalMl(num, displayUnit)
         if (ml <= 0.0 || ml > VolumeConverter.MAX_DAILY_TARGET_ML) return false
         isDirty = false

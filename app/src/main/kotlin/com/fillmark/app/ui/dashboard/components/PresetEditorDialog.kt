@@ -128,9 +128,9 @@ fun PresetEditorDialog(
         mutableStateOf(PresetIcon.fromId(preset?.iconKey))
     }
 
-    val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
+    val inputVal = VolumeConverter.parseDecimalInput(volumeInput) ?: 0.0
     val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
-    val parsedFactor = hydrationFactorInput.toDoubleOrNull() ?: 0.0
+    val parsedFactor = VolumeConverter.parseDecimalInput(hydrationFactorInput) ?: 0.0
     val isFactorValid = VolumeConverter.isValidHydrationFactor(parsedFactor)
     val isLabelValid = labelInput.isNotBlank()
     val isVolumeValid = ml > 0 && ml <= VolumeConverter.MAX_SINGLE_DRINK_ML
@@ -267,7 +267,7 @@ fun PresetEditorDialog(
                                     else -> {}
                                 }
                             },
-                            label = { Text(type.displayName) },
+                            label = { Text(stringResource(type.labelRes)) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -413,7 +413,7 @@ fun PresetEditorDialog(
                             ) {
                                 Icon(
                                     painter = painterResource(id = icon.drawableRes),
-                                    contentDescription = icon.displayName,
+                                    contentDescription = stringResource(icon.labelRes),
                                     tint = if (isSelected) activeColor else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(28.dp)
                                 )

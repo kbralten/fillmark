@@ -48,7 +48,8 @@ class HydrationRepository internal constructor(
     private val runInTransaction: suspend (suspend () -> Unit) -> Unit,
     private val deleteFromHealthConnect: suspend (String) -> Boolean,
     private val enqueueHealthConnectSync: () -> Unit,
-    private val cancelHealthConnectSync: () -> Unit
+    private val cancelHealthConnectSync: () -> Unit,
+    private val defaultPresetsProvider: () -> List<PresetEntity> = { FillmarkDatabase.DEFAULT_PRESETS }
 ) {
     constructor(
         context: Context,
@@ -85,7 +86,8 @@ class HydrationRepository internal constructor(
         },
         cancelHealthConnectSync = {
             HealthConnectManager.cancelAllSyncWork(context)
-        }
+        },
+        defaultPresetsProvider = { FillmarkDatabase.defaultPresets(context) }
     )
 
     fun observePresets(): Flow<List<PresetEntity>> = presetDao.observeAllPresets()
@@ -232,7 +234,7 @@ class HydrationRepository internal constructor(
             targetDao.deleteAllTargets()
             presetDao.deleteAllPresets()
             pendingDeletionDao.deleteAll()
-            presetDao.insertPresets(FillmarkDatabase.DEFAULT_PRESETS)
+            presetDao.insertPresets(defaultPresetsProvider())
         }
         resetPreferencesKeepOnboardingFn()
     }

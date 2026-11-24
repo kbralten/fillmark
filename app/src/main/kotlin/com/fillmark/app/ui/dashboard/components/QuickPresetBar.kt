@@ -107,13 +107,13 @@ fun QuickPresetBar(
             }
 
             // Add Preset Card (matching tinted squircle style)
-            val newCardBg = getBlendedTileColor(FillmarkCyan)
+            val accentColor = MaterialTheme.colorScheme.primary
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = newCardBg
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
                 ),
-                border = BorderStroke(1.dp, FillmarkCyan.copy(alpha = 0.35f)),
+                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
                 modifier = Modifier
                     .widthIn(min = 90.dp)
                     .heightIn(min = 118.dp)
@@ -133,7 +133,7 @@ fun QuickPresetBar(
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = stringResource(R.string.add_custom_preset_cd),
-                        tint = FillmarkCyan,
+                        tint = accentColor,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -141,7 +141,7 @@ fun QuickPresetBar(
                         text = stringResource(R.string.quick_preset_new),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = FillmarkCyan
+                        color = accentColor
                     )
                     Spacer(modifier = Modifier.weight(1f))
                 }

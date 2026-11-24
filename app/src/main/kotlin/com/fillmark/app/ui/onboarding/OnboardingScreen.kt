@@ -111,7 +111,7 @@ fun OnboardingScreen(
         }
     }
 
-    val parsedTarget = targetInput.toDoubleOrNull() ?: 0.0
+    val parsedTarget = VolumeConverter.parseDecimalInput(targetInput) ?: 0.0
     val targetMl = if (hasGoal) VolumeConverter.toInternalMl(parsedTarget, selectedUnit) else 0.0
     val targetValid = !hasGoal || (targetMl > 0.0 && targetMl <= VolumeConverter.MAX_DAILY_TARGET_ML)
 

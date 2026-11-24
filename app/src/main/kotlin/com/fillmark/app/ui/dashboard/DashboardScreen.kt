@@ -83,8 +83,6 @@ import com.fillmark.app.ui.dashboard.components.ManualLogBottomSheet
 import com.fillmark.app.ui.dashboard.components.PresetEditorDialog
 import com.fillmark.app.ui.dashboard.components.QuickPresetBar
 import com.fillmark.app.ui.history.components.EditLogDialog
-import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkNavy900
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -148,8 +146,8 @@ fun DashboardScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { viewModel.openManualLogSheet() },
-                containerColor = FillmarkCyan,
-                contentColor = FillmarkNavy900,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.size(62.dp)
             ) {
@@ -377,7 +375,7 @@ private fun AdjustTodayTargetDialog(
         )
     }
 
-    val parsed = targetInput.toDoubleOrNull() ?: 0.0
+    val parsed = VolumeConverter.parseDecimalInput(targetInput) ?: 0.0
     val ml = VolumeConverter.toInternalMl(parsed, selectedUnit)
     val isValid = ml > 0 && ml <= VolumeConverter.MAX_DAILY_TARGET_ML
     val errorText = when {
@@ -474,6 +472,7 @@ private fun AdjustTodayTargetDialog(
 fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
     val glassOutlineColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
     val rippleLineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+    val waterFillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
     Canvas(modifier = modifier.size(54.dp, 72.dp)) {
         val w = size.width
         val h = size.height
@@ -508,7 +507,7 @@ fun MinimalistGlassIllustration(modifier: Modifier = Modifier) {
         }
         drawPath(
             path = waterFill,
-            color = FillmarkCyan.copy(alpha = 0.16f)
+            color = waterFillColor
         )
 
         // Water surface line
@@ -594,7 +593,7 @@ private fun TodayLogItem(
         ) {
             Surface(
                 shape = CircleShape,
-                color = FillmarkCyan.copy(alpha = 0.15f),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                 modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -608,8 +607,8 @@ private fun TodayLogItem(
             }
 
             Column(modifier = Modifier.padding(start = 12.dp)) {
-                val title = record.displayTitle()
-                val categoryName = DrinkType.fromId(record.drinkType).displayName
+                val categoryName = stringResource(DrinkType.fromId(record.drinkType).labelRes)
+                val title = record.label?.takeIf { it.isNotBlank() } ?: categoryName
                 val timeText = TimeUtils.formatTime(record.timestamp, is24Hour = is24Hour)
                 Text(
                     text = title,

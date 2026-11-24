@@ -37,11 +37,14 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.fillmark.app.MainActivity
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.ShortcutHelper
@@ -118,13 +121,16 @@ class FullDashboardWidget : GlanceAppWidget() {
             val percentDisplay = (rawRatio * 100).roundToInt()
 
             val pacing = if (hasTarget && prefs.wakingPacingEnabled) {
-                PacingCalculator.evaluatePacing(
+                val rawPacing = PacingCalculator.evaluatePacing(
                     currentTime = currentTime,
                     wakeTimeString = prefs.wakingHoursStart,
                     sleepTimeString = prefs.wakingHoursEnd,
                     currentVolumeMl = effectiveTotalMl,
                     dailyTargetMl = targetMl,
                     displayUnit = prefs.displayUnit
+                )
+                rawPacing.copy(
+                    statusText = PacingCalculator.formatStatusText(context, rawPacing, prefs.displayUnit)
                 )
             } else {
                 null
@@ -167,6 +173,13 @@ class FullDashboardWidget : GlanceAppWidget() {
                 dynamicColor = prefs.dynamicColorEnabled
             ) {
                 FullDashboardContent(
+                    appNameText = context.getString(R.string.app_name),
+                    todayLabel = context.getString(R.string.today),
+                    progressCd = context.getString(R.string.widget_progress_cd, percentDisplay),
+                    manualLogCd = context.getString(R.string.widget_manual_log_cd),
+                    undoLabel = context.getString(R.string.action_undo),
+                    emptyPresetsText = context.getString(R.string.widget_open_add_presets),
+                    plusVolumeFormat = context.getString(R.string.quick_preset_plus_volume),
                     hasTarget = hasTarget,
                     consumedText = VolumeConverter.formatVolume(effectiveTotalMl, prefs.displayUnit),
                     targetText = VolumeConverter.formatVolume(targetMl, prefs.displayUnit),
@@ -185,6 +198,13 @@ class FullDashboardWidget : GlanceAppWidget() {
 
     @Composable
     private fun FullDashboardContent(
+        appNameText: String,
+        todayLabel: String,
+        progressCd: String,
+        manualLogCd: String,
+        undoLabel: String,
+        emptyPresetsText: String,
+        plusVolumeFormat: String,
         hasTarget: Boolean,
         consumedText: String,
         targetText: String,
@@ -211,7 +231,7 @@ class FullDashboardWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.Vertical.CenterVertically
             ) {
                 Text(
-                    text = "Fillmark",
+                    text = appNameText,
                     style = TextStyle(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -229,9 +249,9 @@ class FullDashboardWidget : GlanceAppWidget() {
                             .clickable(actionRunCallback<UndoWidgetLogActionCallback>())
                     ) {
                         Text(
-                            text = "Undo",
+                            text = undoLabel,
                             style = TextStyle(
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = GlanceTheme.colors.onPrimaryContainer
                             )
@@ -244,6 +264,7 @@ class FullDashboardWidget : GlanceAppWidget() {
                         .background(GlanceTheme.colors.primaryContainer)
                         .cornerRadius(10.dp)
                         .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .semantics { contentDescription = manualLogCd }
                         .clickable(actionStartActivity(manualLogIntent)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -258,7 +279,7 @@ class FullDashboardWidget : GlanceAppWidget() {
                 }
                 Spacer(modifier = GlanceModifier.width(8.dp))
                 Text(
-                    text = if (hasTarget) "$percentDisplay%" else "Today",
+                    text = if (hasTarget) "$percentDisplay%" else todayLabel,
                     style = TextStyle(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
@@ -277,7 +298,7 @@ class FullDashboardWidget : GlanceAppWidget() {
 
                 Image(
                     provider = ImageProvider(progressBitmap),
-                    contentDescription = "Progress: $percentDisplay%",
+                    contentDescription = progressCd,
                     contentScale = ContentScale.FillBounds,
                     modifier = GlanceModifier.fillMaxWidth().height(18.dp)
                 )
@@ -321,7 +342,7 @@ class FullDashboardWidget : GlanceAppWidget() {
                                     text = pacing.statusText,
                                     maxLines = 1,
                                     style = TextStyle(
-                                        fontSize = 9.5.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = ColorProvider(textColor)
                                     )
@@ -344,7 +365,7 @@ class FullDashboardWidget : GlanceAppWidget() {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Open Fillmark to add presets",
+                        text = emptyPresetsText,
                         style = TextStyle(fontSize = 11.sp, color = GlanceTheme.colors.onSurfaceVariant)
                     )
                 }
@@ -383,23 +404,23 @@ class FullDashboardWidget : GlanceAppWidget() {
                                 Image(
                                     provider = ImageProvider(iconRes),
                                     contentDescription = preset.label,
-                                    modifier = GlanceModifier.size(18.dp)
+                                    modifier = GlanceModifier.size(16.dp)
                                 )
                                 Spacer(modifier = GlanceModifier.height(1.dp))
                                 Text(
                                     text = preset.label,
                                     maxLines = 1,
                                     style = TextStyle(
-                                        fontSize = 9.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = GlanceTheme.colors.onSurface
                                     )
                                 )
                                 Text(
-                                    text = "+$volumeStr",
+                                    text = String.format(plusVolumeFormat, volumeStr),
                                     maxLines = 1,
                                     style = TextStyle(
-                                        fontSize = 8.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = ColorProvider(volumeTextColor)
                                     )

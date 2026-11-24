@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import com.fillmark.app.R
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.FillmarkDatabase
 import com.fillmark.app.data.local.UserPreferencesRepository
@@ -52,7 +53,7 @@ class QuickLogActionCallback : ActionCallback {
         withContext(Dispatchers.Main) {
             Toast.makeText(
                 context,
-                "Logged +$volumeStr (${preset.label})",
+                context.getString(R.string.widget_logged_toast, volumeStr, preset.label),
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -104,7 +105,7 @@ class UndoWidgetLogActionCallback : ActionCallback {
     ) {
         val prefsRepo = UserPreferencesRepository(context)
         val prefs = prefsRepo.preferencesFlow.first()
-        val label = prefs.lastWidgetLogLabel ?: "drink"
+        val label = prefs.lastWidgetLogLabel ?: context.getString(R.string.widget_default_drink)
 
         val undone = executeUndo(
             lastRecordId = prefs.lastWidgetLogRecordId,
@@ -117,7 +118,11 @@ class UndoWidgetLogActionCallback : ActionCallback {
 
         if (undone) {
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Undid $label", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.widget_undid_toast, label),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }

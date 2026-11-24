@@ -87,7 +87,8 @@ class DashboardViewModel @JvmOverloads constructor(
                 repository.preferencesFlow,
                 currentTimeTicker
             ) { summary, presets, prefs, now ->
-                val pacing = if (prefs.wakingPacingEnabled && summary.targetMl > 0) {
+                val app = getApplication<Application>()
+                val rawPacing = if (prefs.wakingPacingEnabled && summary.targetMl > 0) {
                     PacingCalculator.evaluatePacing(
                         currentTime = now.toLocalTime(),
                         wakeTimeString = prefs.wakingHoursStart,
@@ -99,8 +100,11 @@ class DashboardViewModel @JvmOverloads constructor(
                 } else {
                     null
                 }
+                val pacing = rawPacing?.copy(
+                    statusText = PacingCalculator.formatStatusText(app, rawPacing, prefs.displayUnit)
+                )
 
-                val todayLabel = getApplication<Application>().getString(R.string.today)
+                val todayLabel = app.getString(R.string.today)
                 _uiState.update { current ->
                     current.copy(
                         dateHeader = TimeUtils.formatCurrentDateHeader(now.zone, todayLabel = todayLabel),
@@ -169,12 +173,13 @@ class DashboardViewModel @JvmOverloads constructor(
             repository.insertRecord(record)
             WidgetUpdateHelper.updateAllWidgets(getApplication())
             _uiState.update { it.copy(isManualLogSheetOpen = false) }
+            val app = getApplication<Application>()
             showUndoSnackbar(
                 loggedRecord = record,
                 deletedRecord = null,
-                message = getApplication<Application>().getString(
+                message = app.getString(
                     R.string.dashboard_logged_drink,
-                    trimmedLabel ?: type.displayName
+                    trimmedLabel ?: app.getString(type.labelRes)
                 )
             )
         }

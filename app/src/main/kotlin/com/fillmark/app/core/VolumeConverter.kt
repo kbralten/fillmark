@@ -1,5 +1,6 @@
 package com.fillmark.app.core
 
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -15,14 +16,25 @@ object VolumeConverter {
     const val MIN_HYDRATION_FACTOR = 0.1
     const val MAX_HYDRATION_FACTOR = 2.0
 
+    fun decimalSeparator(locale: Locale = Locale.getDefault()): Char {
+        return DecimalFormatSymbols.getInstance(locale).decimalSeparator
+    }
+
+    fun parseDecimalInput(raw: String): Double? {
+        val normalized = raw.trim().replace(',', '.')
+        if (normalized.isEmpty()) return null
+        return normalized.toDoubleOrNull()
+    }
+
     fun isValidHydrationFactor(factor: Double): Boolean {
         return factor.isFinite() && factor in MIN_HYDRATION_FACTOR..MAX_HYDRATION_FACTOR
     }
 
-    fun formatHydrationFactor(factor: Double): String {
+    fun formatHydrationFactor(factor: Double, locale: Locale = Locale.getDefault()): String {
         val rounded = (factor * 100.0).roundToInt() / 100.0
-        val raw = String.format(Locale.US, "%.2f", rounded)
-        return if (raw.endsWith("0") && !raw.endsWith(".0")) {
+        val sep = decimalSeparator(locale)
+        val raw = String.format(locale, "%.2f", rounded)
+        return if (raw.endsWith("0") && !raw.endsWith("${sep}0")) {
             raw.dropLast(1)
         } else {
             raw
@@ -30,17 +42,18 @@ object VolumeConverter {
     }
 
     /**
-     * Filters raw user text to digits and at most one decimal point.
+     * Filters raw user text to digits and at most one locale-aware decimal separator.
      */
-    fun sanitizeDecimalInput(raw: String): String {
+    fun sanitizeDecimalInput(raw: String, locale: Locale = Locale.getDefault()): String {
+        val sep = decimalSeparator(locale)
         val sb = StringBuilder(raw.length)
-        var seenDot = false
+        var seenSeparator = false
         for (c in raw) {
             if (c.isDigit()) {
                 sb.append(c)
-            } else if (c == '.' && !seenDot) {
-                sb.append(c)
-                seenDot = true
+            } else if ((c == '.' || c == ',' || c == sep) && !seenSeparator) {
+                sb.append(sep)
+                seenSeparator = true
             }
         }
         return sb.toString()
@@ -77,36 +90,51 @@ object VolumeConverter {
     /**
      * Formats an internal ml value with its unit symbol (e.g. "500 ml" or "16.9 fl oz").
      */
-    fun formatVolume(ml: Double, unit: DisplayUnit, decimals: Int = 1): String {
+    fun formatVolume(
+        ml: Double,
+        unit: DisplayUnit,
+        decimals: Int = 1,
+        locale: Locale = Locale.getDefault()
+    ): String {
         return when (unit) {
             DisplayUnit.METRIC_ML -> "${ml.roundToInt()} ml"
             DisplayUnit.IMPERIAL_FL_OZ -> {
                 val flOz = mlToFlOz(ml)
-                String.format(Locale.US, "%.${decimals}f fl oz", flOz)
+                String.format(locale, "%.${decimals}f fl oz", flOz)
             }
         }
     }
 
-    fun formatNumberOnly(ml: Double, unit: DisplayUnit, decimals: Int = 1): String {
+    fun formatNumberOnly(
+        ml: Double,
+        unit: DisplayUnit,
+        decimals: Int = 1,
+        locale: Locale = Locale.getDefault()
+    ): String {
         return when (unit) {
             DisplayUnit.METRIC_ML -> "${ml.roundToInt()}"
             DisplayUnit.IMPERIAL_FL_OZ -> {
                 val flOz = mlToFlOz(ml)
-                String.format(Locale.US, "%.${decimals}f", flOz)
+                String.format(locale, "%.${decimals}f", flOz)
             }
         }
     }
 
     /**
-     * Formats a volume number cleanly for text inputs, omitting unnecessary trailing ".0".
+     * Formats a volume number cleanly for text inputs, omitting unnecessary trailing ".0" / ",0".
      */
-    fun formatInputNumber(ml: Double, unit: DisplayUnit): String {
+    fun formatInputNumber(
+        ml: Double,
+        unit: DisplayUnit,
+        locale: Locale = Locale.getDefault()
+    ): String {
         return when (unit) {
             DisplayUnit.METRIC_ML -> "${ml.roundToInt()}"
             DisplayUnit.IMPERIAL_FL_OZ -> {
                 val flOz = mlToFlOz(ml)
-                val formatted = String.format(Locale.US, "%.1f", flOz)
-                if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
+                val formatted = String.format(locale, "%.1f", flOz)
+                val zeroSuffix = "${decimalSeparator(locale)}0"
+                if (formatted.endsWith(zeroSuffix)) formatted.dropLast(2) else formatted
             }
         }
     }
@@ -114,12 +142,16 @@ object VolumeConverter {
     /**
      * Converts an entered volume string from one display unit to another, preserving clean input formatting.
      */
-    fun convertInputVolume(volumeText: String, fromUnit: DisplayUnit, toUnit: DisplayUnit): String {
+    fun convertInputVolume(
+        volumeText: String,
+        fromUnit: DisplayUnit,
+        toUnit: DisplayUnit,
+        locale: Locale = Locale.getDefault()
+    ): String {
         if (fromUnit == toUnit) return volumeText
-        val num = volumeText.toDoubleOrNull() ?: return volumeText
+        val num = parseDecimalInput(volumeText) ?: return volumeText
         if (num <= 0.0) return volumeText
         val internalMl = toInternalMl(num, fromUnit)
-        return formatInputNumber(internalMl, toUnit)
+        return formatInputNumber(internalMl, toUnit, locale)
     }
 }
-

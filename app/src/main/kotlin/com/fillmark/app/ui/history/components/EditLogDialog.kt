@@ -80,9 +80,9 @@ fun EditLogDialog(
     var selectedTimestamp by remember { mutableStateOf(record.timestamp) }
     var showDateTimePicker by remember { mutableStateOf(false) }
 
-    val inputVal = volumeInput.toDoubleOrNull() ?: 0.0
+    val inputVal = VolumeConverter.parseDecimalInput(volumeInput) ?: 0.0
     val ml = VolumeConverter.toInternalMl(inputVal, selectedUnit)
-    val parsedFactor = hydrationFactorInput.toDoubleOrNull() ?: 0.0
+    val parsedFactor = VolumeConverter.parseDecimalInput(hydrationFactorInput) ?: 0.0
     val isFactorValid = !hydrationFactorsEnabled || VolumeConverter.isValidHydrationFactor(parsedFactor)
     val activeFactor = if (hydrationFactorsEnabled) {
         if (isFactorValid) parsedFactor else record.hydrationFactor
@@ -188,7 +188,7 @@ fun EditLogDialog(
                                     )
                                 }
                             },
-                            label = { Text(type.displayName) }
+                            label = { Text(stringResource(type.labelRes)) }
                         )
                     }
                 }

@@ -59,7 +59,7 @@ fun DailyGoalEstimatorDialog(
     var activityLevel by remember { mutableStateOf(ActivityLevel.MODERATE) }
     var warmClimate by remember { mutableStateOf(false) }
 
-    val parsedWeight = weightInput.toDoubleOrNull() ?: 0.0
+    val parsedWeight = VolumeConverter.parseDecimalInput(weightInput) ?: 0.0
     val isWeightValid = parsedWeight > 0.0 && parsedWeight <= 500.0
     val estimatedMl = if (isWeightValid) {
         DailyGoalEstimator.estimateDailyTargetMl(

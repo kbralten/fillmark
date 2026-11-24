@@ -219,7 +219,9 @@ class SettingsViewModel @JvmOverloads constructor(
             val app = getApplication<Application>()
             val message = runCatching {
                 val res = BackupManager.exportBackupToUri(app, uri)
-                app.getString(R.string.settings_exported_backup, res.recordsCount, res.presetsCount)
+                val logsText = app.resources.getQuantityString(R.plurals.logs_count, res.recordsCount, res.recordsCount)
+                val presetsText = app.resources.getQuantityString(R.plurals.presets_count, res.presetsCount, res.presetsCount)
+                app.getString(R.string.settings_exported_backup, logsText, presetsText)
             }.getOrElse {
                 app.getString(R.string.settings_export_failed, it.localizedMessage ?: app.getString(R.string.error_unknown))
             }
@@ -235,7 +237,9 @@ class SettingsViewModel @JvmOverloads constructor(
             val message = runCatching {
                 val res = BackupManager.restoreBackupFromUri(app, uri)
                 restored = true
-                app.getString(R.string.settings_restored_backup, res.recordsCount, res.presetsCount)
+                val logsText = app.resources.getQuantityString(R.plurals.logs_count, res.recordsCount, res.recordsCount)
+                val presetsText = app.resources.getQuantityString(R.plurals.presets_count, res.presetsCount, res.presetsCount)
+                app.getString(R.string.settings_restored_backup, logsText, presetsText)
             }.getOrElse {
                 app.getString(R.string.settings_restore_failed, it.localizedMessage ?: app.getString(R.string.error_invalid_backup))
             }
@@ -255,7 +259,7 @@ class SettingsViewModel @JvmOverloads constructor(
             val app = getApplication<Application>()
             val message = runCatching {
                 val count = BackupManager.exportCsvToUri(app, uri)
-                app.getString(R.string.settings_exported_csv, count)
+                app.resources.getQuantityString(R.plurals.settings_exported_csv, count, count)
             }.getOrElse {
                 app.getString(R.string.settings_csv_failed, it.localizedMessage ?: app.getString(R.string.error_unknown))
             }

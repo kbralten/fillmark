@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -68,11 +70,6 @@ import com.fillmark.app.domain.DailyLineChartData
 import com.fillmark.app.domain.DrinkTypeBreakdownItem
 import com.fillmark.app.ui.analytics.components.BarChart
 import com.fillmark.app.ui.analytics.components.DailyLineChart
-import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkNavy700
-import com.fillmark.app.ui.theme.FillmarkNavy800
-import com.fillmark.app.ui.theme.FillmarkNavy900
-import com.fillmark.app.ui.theme.FillmarkSlateMuted
 import kotlin.math.roundToInt
 
 @Composable
@@ -119,7 +116,7 @@ fun AnalyticsScreen(
                     onClick = { viewModel.selectInterval(interval) },
                     text = {
                         Text(
-                            text = interval.label,
+                            text = stringResource(interval.labelRes),
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -144,8 +141,9 @@ fun AnalyticsScreen(
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = FillmarkNavy800
+                containerColor = MaterialTheme.colorScheme.surface
             ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
                 .fillMaxWidth()
                 .pointerInput(uiState.selectedInterval, uiState.periodOffset, uiState.canGoPrevious) {
@@ -178,7 +176,7 @@ fun AnalyticsScreen(
                         text = stringResource(R.string.analytics_intake_breakdown),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     if (uiState.selectedInterval == AnalyticsInterval.DAY) {
@@ -190,7 +188,7 @@ fun AnalyticsScreen(
                         Text(
                             text = stringResource(R.string.analytics_target_line),
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF8CA3BA)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -238,7 +236,7 @@ fun AnalyticsScreen(
                             Text(
                                 text = stringResource(R.string.analytics_empty_history),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF8CA3BA)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     } else {
@@ -258,7 +256,7 @@ fun AnalyticsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = FillmarkNavy700,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -280,7 +278,7 @@ fun AnalyticsScreen(
                                     text = title,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 val volText = VolumeConverter.formatVolume(inspectedBar.valueMl, uiState.displayUnit)
                                 val targetText = if (inspectedBar.targetMl > 0) {
@@ -289,14 +287,14 @@ fun AnalyticsScreen(
                                 Text(
                                     text = "$volText$targetText",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = FillmarkCyan
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                             if (inspectedBar.dateIso != null) {
                                 TextButton(onClick = { viewModel.inspectDate(inspectedBar.dateIso) }) {
                                     Text(
                                         text = stringResource(R.string.analytics_view_day),
-                                        color = FillmarkCyan,
+                                        color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -353,7 +351,12 @@ fun AnalyticsScreen(
                 value = if (hasTarget) "$successRate%" else "0%",
                 icon = Icons.Outlined.TrackChanges,
                 subtitle = if (hasTarget && uiState.totalDays > 0) {
-                    stringResource(R.string.analytics_days_met_subtitle, uiState.daysGoalMet, uiState.totalDays)
+                    pluralStringResource(
+                        R.plurals.analytics_days_met_subtitle,
+                        uiState.totalDays,
+                        uiState.daysGoalMet,
+                        uiState.totalDays
+                    )
                 } else null,
                 modifier = Modifier.weight(1f)
             )
@@ -411,7 +414,7 @@ private fun DrinkBreakdownCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = item.drinkType.displayName,
+                            text = stringResource(item.drinkType.labelRes),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface
@@ -510,7 +513,7 @@ private fun DailyModeSelector(
 ) {
     Row(
         modifier = modifier
-            .background(FillmarkNavy700, RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -518,17 +521,19 @@ private fun DailyModeSelector(
             val isSelected = mode == selectedMode
             Box(
                 modifier = Modifier
+                    .widthIn(min = 48.dp)
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(9.dp))
-                    .background(if (isSelected) FillmarkCyan else Color.Transparent)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
                     .clickable { onModeSelected(mode) }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = mode.label,
+                    text = stringResource(mode.labelRes),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) FillmarkNavy900 else FillmarkSlateMuted
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -553,7 +558,7 @@ private fun DailyGraphLegend(
             Box(
                 modifier = Modifier
                     .size(width = 12.dp, height = 3.dp)
-                    .background(FillmarkCyan, RoundedCornerShape(1.5.dp))
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.5.dp))
             )
             Text(
                 text = if (mode == DailyGraphMode.CUMULATIVE) {
@@ -562,7 +567,7 @@ private fun DailyGraphLegend(
                     stringResource(R.string.analytics_legend_rate)
                 },
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFCAD7E2)
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
 
@@ -576,12 +581,12 @@ private fun DailyGraphLegend(
                         text = "--",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF8CA3BA)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = stringResource(R.string.analytics_legend_target),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF8CA3BA)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -593,12 +598,12 @@ private fun DailyGraphLegend(
                         text = "··",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF38BDF8)
+                        color = MaterialTheme.colorScheme.tertiary
                     )
                     Text(
                         text = stringResource(R.string.analytics_legend_target_pace),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF38BDF8)
+                        color = MaterialTheme.colorScheme.tertiary
                     )
                 }
             } else {
@@ -610,12 +615,12 @@ private fun DailyGraphLegend(
                         text = "--",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF8CA3BA)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = stringResource(R.string.analytics_legend_target_rate),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF8CA3BA)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

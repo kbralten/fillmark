@@ -1,8 +1,10 @@
 package com.fillmark.app.ui.analytics
 
 import android.app.Application
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.data.local.UserPreferences
@@ -13,12 +15,15 @@ import com.fillmark.app.domain.DailyGraphCalculator
 import com.fillmark.app.domain.DailyGraphMode
 import com.fillmark.app.domain.DailyLineChartData
 import com.fillmark.app.domain.DrinkTypeBreakdownItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -26,13 +31,13 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-enum class AnalyticsInterval(val label: String) {
-    DAY("Day"),
-    WEEK("Week"),
-    MONTH("Month"),
-    THREE_MONTHS("3M"),
-    YEAR("Year"),
-    ALL_TIME("All")
+enum class AnalyticsInterval(val label: String, @param:StringRes val labelRes: Int) {
+    DAY("Day", R.string.analytics_interval_day),
+    WEEK("Week", R.string.analytics_interval_week),
+    MONTH("Month", R.string.analytics_interval_month),
+    THREE_MONTHS("3M", R.string.analytics_interval_3m),
+    YEAR("Year", R.string.analytics_interval_year),
+    ALL_TIME("All", R.string.analytics_interval_all)
 }
 
 data class ChartBarData(
@@ -74,6 +79,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
     private var allTargetsMap: Map<String, Double> = emptyMap()
     private var userPreferences: UserPreferences = UserPreferences()
     private var lastCalculatedDate: LocalDate = LocalDate.now()
+    private var calculationJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -145,14 +151,15 @@ class AnalyticsViewModel @JvmOverloads constructor(
         offset: Int,
         today: LocalDate
     ): String {
+        val app = getApplication<Application>()
         val locale = Locale.getDefault()
         val monthDayFormat = DateTimeFormatter.ofPattern("MMM d", locale)
         return when (interval) {
             AnalyticsInterval.DAY -> {
                 val date = today.minusDays(offset.toLong())
                 when (offset) {
-                    0 -> "Today (${date.format(monthDayFormat)})"
-                    1 -> "Yesterday (${date.format(monthDayFormat)})"
+                    0 -> app.getString(R.string.analytics_period_today, date.format(monthDayFormat))
+                    1 -> app.getString(R.string.analytics_period_yesterday, date.format(monthDayFormat))
                     else -> date.format(DateTimeFormatter.ofPattern("EEE, MMM d", locale))
                 }
             }
@@ -160,17 +167,37 @@ class AnalyticsViewModel @JvmOverloads constructor(
                 val end = today.minusDays((offset * 7).toLong())
                 val start = end.minusDays(6)
                 when (offset) {
-                    0 -> "This Week (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
-                    1 -> "Last Week (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
-                    else -> "${start.format(monthDayFormat)} – ${end.format(monthDayFormat)}"
+                    0 -> app.getString(
+                        R.string.analytics_period_this_week,
+                        start.format(monthDayFormat),
+                        end.format(monthDayFormat)
+                    )
+                    1 -> app.getString(
+                        R.string.analytics_period_last_week,
+                        start.format(monthDayFormat),
+                        end.format(monthDayFormat)
+                    )
+                    else -> app.getString(
+                        R.string.analytics_period_range,
+                        start.format(monthDayFormat),
+                        end.format(monthDayFormat)
+                    )
                 }
             }
             AnalyticsInterval.MONTH -> {
                 val end = today.minusDays((offset * 30).toLong())
                 val start = end.minusDays(29)
                 when (offset) {
-                    0 -> "Past 30 Days (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
-                    else -> "${start.format(monthDayFormat)} – ${end.format(monthDayFormat)}"
+                    0 -> app.getString(
+                        R.string.analytics_period_past_30_days,
+                        start.format(monthDayFormat),
+                        end.format(monthDayFormat)
+                    )
+                    else -> app.getString(
+                        R.string.analytics_period_range,
+                        start.format(monthDayFormat),
+                        end.format(monthDayFormat)
+                    )
                 }
             }
             AnalyticsInterval.THREE_MONTHS -> {
@@ -178,8 +205,16 @@ class AnalyticsViewModel @JvmOverloads constructor(
                 val start = end.minusDays((12 * 7 - 1).toLong())
                 val yearFormat = DateTimeFormatter.ofPattern("MMM d, yyyy", locale)
                 when (offset) {
-                    0 -> "Past 12 Weeks (${start.format(monthDayFormat)} – ${end.format(monthDayFormat)})"
-                    else -> "${start.format(yearFormat)} – ${end.format(yearFormat)}"
+                    0 -> app.getString(
+                        R.string.analytics_period_past_12_weeks,
+                        start.format(monthDayFormat),
+                        end.format(monthDayFormat)
+                    )
+                    else -> app.getString(
+                        R.string.analytics_period_range,
+                        start.format(yearFormat),
+                        end.format(yearFormat)
+                    )
                 }
             }
             AnalyticsInterval.YEAR -> {
@@ -187,287 +222,302 @@ class AnalyticsViewModel @JvmOverloads constructor(
                 val start = end.minusDays((52 * 7 - 1).toLong())
                 val yearMonthFormat = DateTimeFormatter.ofPattern("MMM yyyy", locale)
                 when (offset) {
-                    0 -> "Past 52 Weeks (${start.format(yearMonthFormat)} – ${end.format(yearMonthFormat)})"
-                    else -> "${start.format(yearMonthFormat)} – ${end.format(yearMonthFormat)}"
+                    0 -> app.getString(
+                        R.string.analytics_period_past_52_weeks,
+                        start.format(yearMonthFormat),
+                        end.format(yearMonthFormat)
+                    )
+                    else -> app.getString(
+                        R.string.analytics_period_range,
+                        start.format(yearMonthFormat),
+                        end.format(yearMonthFormat)
+                    )
                 }
             }
-            AnalyticsInterval.ALL_TIME -> "All Time"
+            AnalyticsInterval.ALL_TIME -> app.getString(R.string.analytics_period_all_time)
         }
     }
 
     private fun calculateAnalytics(interval: AnalyticsInterval, offset: Int = _uiState.value.periodOffset) {
-        val zoneId = ZoneId.systemDefault()
-        val today = LocalDate.now(zoneId)
-        lastCalculatedDate = today
-        val factorsEnabled = userPreferences.hydrationFactorsEnabled
-        val periodLabel = formatPeriodLabel(interval, offset, today)
-        val streakStats = AnalyticsInsightsCalculator.calculateStreaks(
-            records = allRecords,
-            defaultTargetMl = defaultTargetMl,
-            allTargetsMap = allTargetsMap,
-            hydrationFactorsEnabled = factorsEnabled,
-            today = today,
-            zoneId = zoneId
-        )
+        val recordsSnapshot = allRecords
+        val prefsSnapshot = userPreferences
+        val defaultTargetSnapshot = defaultTargetMl
+        val targetsSnapshot = allTargetsMap
+        val dailyModeSnapshot = _uiState.value.dailyGraphMode
 
-        when (interval) {
-            AnalyticsInterval.DAY -> {
-                val targetDate = today.minusDays(offset.toLong())
-                val targetDateIso = targetDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                val targetMlForDay = allTargetsMap[targetDateIso] ?: defaultTargetMl
-
-                val dayChartData = DailyGraphCalculator.calculate(
-                    records = allRecords,
-                    date = targetDate,
-                    zoneId = zoneId,
-                    targetMl = targetMlForDay,
-                    wakingHoursStart = userPreferences.wakingHoursStart,
-                    wakingHoursEnd = userPreferences.wakingHoursEnd,
-                    wakingPacingEnabled = userPreferences.wakingPacingEnabled,
-                    displayUnit = userPreferences.displayUnit,
-                    mode = _uiState.value.dailyGraphMode,
-                    hydrationFactorsEnabled = factorsEnabled
-                )
-                val dayStart = TimeUtils.startOfDayMillis(targetDate, zoneId)
-                val dayEnd = TimeUtils.endOfDayMillis(targetDate, zoneId)
-                val periodRecords = allRecords.filter { it.timestamp in dayStart..dayEnd }
-                val breakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(periodRecords, factorsEnabled)
-
-                _uiState.update {
-                    it.copy(
-                        periodOffset = offset,
-                        periodLabel = periodLabel,
-                        canGoPrevious = true,
-                        bars = emptyList(),
-                        dailyLineChartData = dayChartData,
-                        totalVolumeMl = dayChartData.totalIntakeMl,
-                        averageDailyVolumeMl = dayChartData.totalIntakeMl,
-                        daysGoalMet = if (dayChartData.hasTarget && dayChartData.totalIntakeMl >= dayChartData.targetVolumeMl) 1 else 0,
-                        totalDays = 1,
-                        currentStreak = streakStats.currentStreak,
-                        bestStreak = streakStats.bestStreak,
-                        drinkBreakdown = breakdown
-                    )
-                }
-            }
-
-            AnalyticsInterval.WEEK -> {
-                val endOfWeek = today.minusDays((offset * 7).toLong())
-                val startOfWeek = endOfWeek.minusDays(6)
-                val bars = (6 downTo 0).map { daysAgo ->
-                    val date = endOfWeek.minusDays(daysAgo.toLong())
-                    val dateIso = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    val start = TimeUtils.startOfDayMillis(date, zoneId)
-                    val end = TimeUtils.endOfDayMillis(date, zoneId)
-                    val dayRecords = allRecords.filter { it.timestamp in start..end }
-                    val effective = dayRecords.sumOf { it.countedVolumeMl(factorsEnabled) }
-                    val dayTarget = allTargetsMap[dateIso] ?: defaultTargetMl
-
-                    ChartBarData(
-                        label = date.format(DateTimeFormatter.ofPattern("EEE", Locale.getDefault())),
-                        valueMl = effective,
-                        targetMl = dayTarget,
-                        isCurrent = (offset == 0 && daysAgo == 0),
-                        dateIso = dateIso
-                    )
-                }
-
-                val periodRecords = allRecords.filter {
-                    it.timestamp in TimeUtils.startOfDayMillis(startOfWeek, zoneId)..TimeUtils.endOfDayMillis(endOfWeek, zoneId)
-                }
-                val total = bars.sumOf { it.valueMl }
-                val met = bars.count { it.targetMl > 0 && it.valueMl >= it.targetMl }
-                _uiState.update {
-                    it.copy(
-                        periodOffset = offset,
-                        periodLabel = periodLabel,
-                        canGoPrevious = true,
-                        bars = bars,
-                        totalVolumeMl = total,
-                        averageDailyVolumeMl = total / 7.0,
-                        daysGoalMet = met,
-                        totalDays = 7,
-                        currentStreak = streakStats.currentStreak,
-                        bestStreak = streakStats.bestStreak,
-                        drinkBreakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(periodRecords, factorsEnabled)
-                    )
-                }
-            }
-
-            AnalyticsInterval.MONTH -> {
-                val endOfMonth = today.minusDays((offset * 30).toLong())
-                val startOfMonth = endOfMonth.minusDays(29)
-                val bars = (29 downTo 0).map { daysAgo ->
-                    val date = endOfMonth.minusDays(daysAgo.toLong())
-                    val dateIso = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    val start = TimeUtils.startOfDayMillis(date, zoneId)
-                    val end = TimeUtils.endOfDayMillis(date, zoneId)
-                    val dayRecords = allRecords.filter { it.timestamp in start..end }
-                    val effective = dayRecords.sumOf { it.countedVolumeMl(factorsEnabled) }
-                    val label = if (daysAgo % 5 == 0) date.format(DateTimeFormatter.ofPattern("d", Locale.getDefault())) else ""
-                    val dayTarget = allTargetsMap[dateIso] ?: defaultTargetMl
-
-                    ChartBarData(
-                        label = label,
-                        valueMl = effective,
-                        targetMl = dayTarget,
-                        isCurrent = (offset == 0 && daysAgo == 0),
-                        dateIso = dateIso
-                    )
-                }
-
-                val periodRecords = allRecords.filter {
-                    it.timestamp in TimeUtils.startOfDayMillis(startOfMonth, zoneId)..TimeUtils.endOfDayMillis(endOfMonth, zoneId)
-                }
-                val total = bars.sumOf { it.valueMl }
-                val met = bars.count { it.targetMl > 0 && it.valueMl >= it.targetMl }
-                _uiState.update {
-                    it.copy(
-                        periodOffset = offset,
-                        periodLabel = periodLabel,
-                        canGoPrevious = true,
-                        bars = bars,
-                        totalVolumeMl = total,
-                        averageDailyVolumeMl = total / 30.0,
-                        daysGoalMet = met,
-                        totalDays = 30,
-                        currentStreak = streakStats.currentStreak,
-                        bestStreak = streakStats.bestStreak,
-                        drinkBreakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(periodRecords, factorsEnabled)
-                    )
-                }
-            }
-
-            AnalyticsInterval.THREE_MONTHS, AnalyticsInterval.YEAR -> {
-                val numWeeks = if (interval == AnalyticsInterval.THREE_MONTHS) 12 else 52
-                val summary = computeMultiWeekSummary(
-                    records = allRecords,
-                    numWeeks = numWeeks,
-                    offset = offset,
+        calculationJob?.cancel()
+        calculationJob = viewModelScope.launch {
+            val computedState = withContext(Dispatchers.Default) {
+                val zoneId = ZoneId.systemDefault()
+                val today = LocalDate.now(zoneId)
+                lastCalculatedDate = today
+                val factorsEnabled = prefsSnapshot.hydrationFactorsEnabled
+                val periodLabel = formatPeriodLabel(interval, offset, today)
+                val streakStats = AnalyticsInsightsCalculator.calculateStreaks(
+                    records = recordsSnapshot,
+                    defaultTargetMl = defaultTargetSnapshot,
+                    allTargetsMap = targetsSnapshot,
+                    hydrationFactorsEnabled = factorsEnabled,
                     today = today,
-                    zoneId = zoneId,
-                    defaultTargetMl = defaultTargetMl,
-                    allTargetsMap = allTargetsMap,
-                    hydrationFactorsEnabled = factorsEnabled
+                    zoneId = zoneId
                 )
 
-                val endOfPeriod = today.minusDays((offset * numWeeks * 7).toLong())
-                val startOfPeriod = endOfPeriod.minusDays((numWeeks * 7 - 1).toLong())
-                val periodRecords = allRecords.filter {
-                    it.timestamp in TimeUtils.startOfDayMillis(startOfPeriod, zoneId)..TimeUtils.endOfDayMillis(endOfPeriod, zoneId)
-                }
+                val recordsByDate = recordsSnapshot.groupBy { TimeUtils.toLocalDate(it.timestamp, zoneId) }
 
-                _uiState.update {
-                    it.copy(
-                        periodOffset = offset,
-                        periodLabel = periodLabel,
-                        canGoPrevious = true,
-                        bars = summary.bars,
-                        totalVolumeMl = summary.totalVolumeMl,
-                        averageDailyVolumeMl = summary.averageDailyVolumeMl,
-                        daysGoalMet = summary.daysGoalMet,
-                        totalDays = summary.totalDays,
-                        currentStreak = streakStats.currentStreak,
-                        bestStreak = streakStats.bestStreak,
-                        drinkBreakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(periodRecords, factorsEnabled)
-                    )
-                }
-            }
+                when (interval) {
+                    AnalyticsInterval.DAY -> {
+                        val targetDate = today.minusDays(offset.toLong())
+                        val targetDateIso = targetDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                        val targetMlForDay = targetsSnapshot[targetDateIso] ?: defaultTargetSnapshot
+                        val dayRecords = recordsByDate[targetDate].orEmpty()
 
-            AnalyticsInterval.ALL_TIME -> {
-                val validRecords = allRecords.filter { !TimeUtils.toLocalDate(it.timestamp, zoneId).isAfter(today) }
-                if (validRecords.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
-                            periodOffset = 0,
+                        val dayChartData = DailyGraphCalculator.calculate(
+                            records = dayRecords,
+                            date = targetDate,
+                            zoneId = zoneId,
+                            targetMl = targetMlForDay,
+                            wakingHoursStart = prefsSnapshot.wakingHoursStart,
+                            wakingHoursEnd = prefsSnapshot.wakingHoursEnd,
+                            wakingPacingEnabled = prefsSnapshot.wakingPacingEnabled,
+                            displayUnit = prefsSnapshot.displayUnit,
+                            mode = dailyModeSnapshot,
+                            hydrationFactorsEnabled = factorsEnabled
+                        )
+                        val breakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(dayRecords, factorsEnabled)
+
+                        _uiState.value.copy(
+                            selectedInterval = interval,
+                            dailyGraphMode = dailyModeSnapshot,
+                            displayUnit = prefsSnapshot.displayUnit,
+                            periodOffset = offset,
                             periodLabel = periodLabel,
-                            canGoPrevious = false,
+                            canGoPrevious = true,
                             bars = emptyList(),
-                            totalVolumeMl = 0.0,
-                            averageDailyVolumeMl = 0.0,
-                            daysGoalMet = 0,
-                            totalDays = 0,
-                            currentStreak = 0,
-                            bestStreak = 0,
-                            drinkBreakdown = emptyList()
+                            dailyLineChartData = dayChartData,
+                            totalVolumeMl = dayChartData.totalIntakeMl,
+                            averageDailyVolumeMl = dayChartData.totalIntakeMl,
+                            daysGoalMet = if (dayChartData.hasTarget && dayChartData.totalIntakeMl >= dayChartData.targetVolumeMl) 1 else 0,
+                            totalDays = 1,
+                            currentStreak = streakStats.currentStreak,
+                            bestStreak = streakStats.bestStreak,
+                            drinkBreakdown = breakdown
                         )
                     }
-                    return
-                }
 
-                val earliestDate = validRecords.minOf { TimeUtils.toLocalDate(it.timestamp, zoneId) }
-                val startYm = YearMonth.from(earliestDate)
-                val endYm = YearMonth.from(today)
-                val months = mutableListOf<YearMonth>()
-                var ymCursor = startYm
-                while (!ymCursor.isAfter(endYm)) {
-                    months.add(ymCursor)
-                    ymCursor = ymCursor.plusMonths(1)
-                }
+                    AnalyticsInterval.WEEK -> {
+                        val endOfWeek = today.minusDays((offset * 7).toLong())
+                        val periodRecords = mutableListOf<HydrationRecordEntity>()
+                        val dayFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+                        val bars = (6 downTo 0).map { daysAgo ->
+                            val date = endOfWeek.minusDays(daysAgo.toLong())
+                            val dateIso = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                            val dayRecords = recordsByDate[date].orEmpty()
+                            periodRecords.addAll(dayRecords)
+                            val effective = dayRecords.sumOf { it.countedVolumeMl(factorsEnabled) }
+                            val dayTarget = targetsSnapshot[dateIso] ?: defaultTargetSnapshot
 
-                val labelStride = (months.size / 6).coerceAtLeast(1)
-                val bars = months.mapIndexed { idx, ym ->
-                    val monthStart = if (ym == startYm) earliestDate else ym.atDay(1)
-                    val monthEnd = if (ym == endYm) today else ym.atEndOfMonth()
-                    val daysInSlice = (ChronoUnit.DAYS.between(monthStart, monthEnd).toInt() + 1).coerceAtLeast(1)
-                    val startMs = TimeUtils.startOfDayMillis(monthStart, zoneId)
-                    val endMs = TimeUtils.endOfDayMillis(monthEnd, zoneId)
-                    val monthTotal = validRecords
-                        .filter { it.timestamp in startMs..endMs }
-                        .sumOf { it.countedVolumeMl(factorsEnabled) }
+                            ChartBarData(
+                                label = date.format(dayFormatter),
+                                valueMl = effective,
+                                targetMl = dayTarget,
+                                isCurrent = (offset == 0 && daysAgo == 0),
+                                dateIso = dateIso
+                            )
+                        }
 
-                    var targetSum = 0.0
-                    var d = monthStart
-                    while (!d.isAfter(monthEnd)) {
-                        val dIso = d.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                        targetSum += allTargetsMap[dIso] ?: defaultTargetMl
-                        d = d.plusDays(1)
+                        val total = bars.sumOf { it.valueMl }
+                        val met = bars.count { it.targetMl > 0 && it.valueMl >= it.targetMl }
+                        _uiState.value.copy(
+                            selectedInterval = interval,
+                            dailyGraphMode = dailyModeSnapshot,
+                            displayUnit = prefsSnapshot.displayUnit,
+                            periodOffset = offset,
+                            periodLabel = periodLabel,
+                            canGoPrevious = true,
+                            bars = bars,
+                            totalVolumeMl = total,
+                            averageDailyVolumeMl = total / 7.0,
+                            daysGoalMet = met,
+                            totalDays = 7,
+                            currentStreak = streakStats.currentStreak,
+                            bestStreak = streakStats.bestStreak,
+                            drinkBreakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(periodRecords, factorsEnabled)
+                        )
                     }
 
-                    val showLabel = (idx % labelStride == 0) || ym == endYm
-                    ChartBarData(
-                        label = if (showLabel) ym.format(DateTimeFormatter.ofPattern("MMM", Locale.getDefault())) else "",
-                        valueMl = monthTotal / daysInSlice,
-                        targetMl = targetSum / daysInSlice,
-                        isCurrent = (ym == endYm)
-                    )
-                }
+                    AnalyticsInterval.MONTH -> {
+                        val endOfMonth = today.minusDays((offset * 30).toLong())
+                        val periodRecords = mutableListOf<HydrationRecordEntity>()
+                        val dayFormatter = DateTimeFormatter.ofPattern("d", Locale.getDefault())
+                        val bars = (29 downTo 0).map { daysAgo ->
+                            val date = endOfMonth.minusDays(daysAgo.toLong())
+                            val dateIso = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                            val dayRecords = recordsByDate[date].orEmpty()
+                            periodRecords.addAll(dayRecords)
+                            val effective = dayRecords.sumOf { it.countedVolumeMl(factorsEnabled) }
+                            val label = if (daysAgo % 5 == 0) date.format(dayFormatter) else ""
+                            val dayTarget = targetsSnapshot[dateIso] ?: defaultTargetSnapshot
 
-                val dailyTotals = mutableMapOf<LocalDate, Double>()
-                for (r in validRecords) {
-                    val d = TimeUtils.toLocalDate(r.timestamp, zoneId)
-                    dailyTotals[d] = (dailyTotals[d] ?: 0.0) + r.countedVolumeMl(factorsEnabled)
-                }
+                            ChartBarData(
+                                label = label,
+                                valueMl = effective,
+                                targetMl = dayTarget,
+                                isCurrent = (offset == 0 && daysAgo == 0),
+                                dateIso = dateIso
+                            )
+                        }
 
-                var totalDays = 0
-                var metDays = 0
-                var dayCursor = earliestDate
-                while (!dayCursor.isAfter(today)) {
-                    totalDays++
-                    val dIso = dayCursor.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    val t = allTargetsMap[dIso] ?: defaultTargetMl
-                    val v = dailyTotals[dayCursor] ?: 0.0
-                    if (t > 0 && v >= t) metDays++
-                    dayCursor = dayCursor.plusDays(1)
-                }
+                        val total = bars.sumOf { it.valueMl }
+                        val met = bars.count { it.targetMl > 0 && it.valueMl >= it.targetMl }
+                        _uiState.value.copy(
+                            selectedInterval = interval,
+                            dailyGraphMode = dailyModeSnapshot,
+                            displayUnit = prefsSnapshot.displayUnit,
+                            periodOffset = offset,
+                            periodLabel = periodLabel,
+                            canGoPrevious = true,
+                            bars = bars,
+                            totalVolumeMl = total,
+                            averageDailyVolumeMl = total / 30.0,
+                            daysGoalMet = met,
+                            totalDays = 30,
+                            currentStreak = streakStats.currentStreak,
+                            bestStreak = streakStats.bestStreak,
+                            drinkBreakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(periodRecords, factorsEnabled)
+                        )
+                    }
 
-                val totalVolume = validRecords.sumOf { it.countedVolumeMl(factorsEnabled) }
-                _uiState.update {
-                    it.copy(
-                        periodOffset = 0,
-                        periodLabel = periodLabel,
-                        canGoPrevious = false,
-                        bars = bars,
-                        totalVolumeMl = totalVolume,
-                        averageDailyVolumeMl = if (totalDays > 0) totalVolume / totalDays else 0.0,
-                        daysGoalMet = metDays,
-                        totalDays = totalDays,
-                        currentStreak = streakStats.currentStreak,
-                        bestStreak = streakStats.bestStreak,
-                        drinkBreakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(validRecords, factorsEnabled)
-                    )
+                    AnalyticsInterval.THREE_MONTHS, AnalyticsInterval.YEAR -> {
+                        val numWeeks = if (interval == AnalyticsInterval.THREE_MONTHS) 12 else 52
+                        val summary = computeMultiWeekSummary(
+                            records = recordsSnapshot,
+                            numWeeks = numWeeks,
+                            offset = offset,
+                            today = today,
+                            zoneId = zoneId,
+                            defaultTargetMl = defaultTargetSnapshot,
+                            allTargetsMap = targetsSnapshot,
+                            hydrationFactorsEnabled = factorsEnabled,
+                            pregroupedByDate = recordsByDate
+                        )
+
+                        val endOfPeriod = today.minusDays((offset * numWeeks * 7).toLong())
+                        val startOfPeriod = endOfPeriod.minusDays((numWeeks * 7 - 1).toLong())
+                        val periodRecords = collectRecordsInDateRange(recordsByDate, startOfPeriod, endOfPeriod)
+
+                        _uiState.value.copy(
+                            selectedInterval = interval,
+                            dailyGraphMode = dailyModeSnapshot,
+                            displayUnit = prefsSnapshot.displayUnit,
+                            periodOffset = offset,
+                            periodLabel = periodLabel,
+                            canGoPrevious = true,
+                            bars = summary.bars,
+                            totalVolumeMl = summary.totalVolumeMl,
+                            averageDailyVolumeMl = summary.averageDailyVolumeMl,
+                            daysGoalMet = summary.daysGoalMet,
+                            totalDays = summary.totalDays,
+                            currentStreak = streakStats.currentStreak,
+                            bestStreak = streakStats.bestStreak,
+                            drinkBreakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(periodRecords, factorsEnabled)
+                        )
+                    }
+
+                    AnalyticsInterval.ALL_TIME -> {
+                        val validEntries = recordsByDate.entries.filter { !it.key.isAfter(today) }
+                        if (validEntries.isEmpty()) {
+                            _uiState.value.copy(
+                                selectedInterval = interval,
+                                dailyGraphMode = dailyModeSnapshot,
+                                displayUnit = prefsSnapshot.displayUnit,
+                                periodOffset = 0,
+                                periodLabel = periodLabel,
+                                canGoPrevious = false,
+                                bars = emptyList(),
+                                totalVolumeMl = 0.0,
+                                averageDailyVolumeMl = 0.0,
+                                daysGoalMet = 0,
+                                totalDays = 0,
+                                currentStreak = 0,
+                                bestStreak = 0,
+                                drinkBreakdown = emptyList()
+                            )
+                        } else {
+                            val earliestDate = validEntries.minOf { it.key }
+                            val dailyTotals = validEntries.associate { (date, list) ->
+                                date to list.sumOf { it.countedVolumeMl(factorsEnabled) }
+                            }
+                            val validRecords = validEntries.flatMap { it.value }
+
+                            val startYm = YearMonth.from(earliestDate)
+                            val endYm = YearMonth.from(today)
+                            val months = mutableListOf<YearMonth>()
+                            var ymCursor = startYm
+                            while (!ymCursor.isAfter(endYm)) {
+                                months.add(ymCursor)
+                                ymCursor = ymCursor.plusMonths(1)
+                            }
+
+                            val labelStride = (months.size / 6).coerceAtLeast(1)
+                            val monthLabelFmt = DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
+                            val bars = months.mapIndexed { idx, ym ->
+                                val monthStart = if (ym == startYm) earliestDate else ym.atDay(1)
+                                val monthEnd = if (ym == endYm) today else ym.atEndOfMonth()
+                                val daysInSlice = (ChronoUnit.DAYS.between(monthStart, monthEnd).toInt() + 1).coerceAtLeast(1)
+
+                                var monthTotal = 0.0
+                                var targetSum = 0.0
+                                var d = monthStart
+                                while (!d.isAfter(monthEnd)) {
+                                    monthTotal += dailyTotals[d] ?: 0.0
+                                    val dIso = d.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                                    targetSum += targetsSnapshot[dIso] ?: defaultTargetSnapshot
+                                    d = d.plusDays(1)
+                                }
+
+                                val showLabel = (idx % labelStride == 0) || ym == endYm
+                                ChartBarData(
+                                    label = if (showLabel) ym.format(monthLabelFmt) else "",
+                                    valueMl = monthTotal / daysInSlice,
+                                    targetMl = targetSum / daysInSlice,
+                                    isCurrent = (ym == endYm)
+                                )
+                            }
+
+                            var totalDays = 0
+                            var metDays = 0
+                            var dayCursor = earliestDate
+                            while (!dayCursor.isAfter(today)) {
+                                totalDays++
+                                val dIso = dayCursor.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                                val t = targetsSnapshot[dIso] ?: defaultTargetSnapshot
+                                val v = dailyTotals[dayCursor] ?: 0.0
+                                if (t > 0 && v >= t) metDays++
+                                dayCursor = dayCursor.plusDays(1)
+                            }
+
+                            val totalVolume = dailyTotals.values.sum()
+                            _uiState.value.copy(
+                                selectedInterval = interval,
+                                dailyGraphMode = dailyModeSnapshot,
+                                displayUnit = prefsSnapshot.displayUnit,
+                                periodOffset = 0,
+                                periodLabel = periodLabel,
+                                canGoPrevious = false,
+                                bars = bars,
+                                totalVolumeMl = totalVolume,
+                                averageDailyVolumeMl = if (totalDays > 0) totalVolume / totalDays else 0.0,
+                                daysGoalMet = metDays,
+                                totalDays = totalDays,
+                                currentStreak = streakStats.currentStreak,
+                                bestStreak = streakStats.bestStreak,
+                                drinkBreakdown = AnalyticsInsightsCalculator.calculateDrinkBreakdown(validRecords, factorsEnabled)
+                            )
+                        }
+                    }
                 }
             }
+            _uiState.value = computedState
         }
     }
 
@@ -480,6 +530,20 @@ class AnalyticsViewModel @JvmOverloads constructor(
     )
 
     companion object {
+        private fun collectRecordsInDateRange(
+            recordsByDate: Map<LocalDate, List<HydrationRecordEntity>>,
+            startDate: LocalDate,
+            endDate: LocalDate
+        ): List<HydrationRecordEntity> {
+            val result = mutableListOf<HydrationRecordEntity>()
+            var cursor = startDate
+            while (!cursor.isAfter(endDate)) {
+                recordsByDate[cursor]?.let { result.addAll(it) }
+                cursor = cursor.plusDays(1)
+            }
+            return result
+        }
+
         fun computeMultiWeekSummary(
             records: List<HydrationRecordEntity>,
             numWeeks: Int,
@@ -488,11 +552,19 @@ class AnalyticsViewModel @JvmOverloads constructor(
             zoneId: ZoneId,
             defaultTargetMl: Double,
             allTargetsMap: Map<String, Double>,
-            hydrationFactorsEnabled: Boolean = true
+            hydrationFactorsEnabled: Boolean = true,
+            pregroupedByDate: Map<LocalDate, List<HydrationRecordEntity>>? = null
         ): MultiWeekSummary {
+            val recordsByDate = pregroupedByDate
+                ?: records.groupBy { TimeUtils.toLocalDate(it.timestamp, zoneId) }
+            val dailyTotals = recordsByDate.mapValues { (_, list) ->
+                list.sumOf { it.countedVolumeMl(hydrationFactorsEnabled) }
+            }
+
             val endOfPeriod = today.minusDays((offset * numWeeks * 7).toLong())
             var daysGoalMet = 0
             var totalVolumeMl = 0.0
+            val monthFmt = DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
 
             val bars = (numWeeks - 1 downTo 0).map { weeksAgo ->
                 val weekEnd = endOfPeriod.minusDays((weeksAgo * 7).toLong())
@@ -503,11 +575,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
                 for (dayOffset in 0..6) {
                     val day = weekStart.plusDays(dayOffset.toLong())
                     val dayIso = day.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    val startMs = TimeUtils.startOfDayMillis(day, zoneId)
-                    val endMs = TimeUtils.endOfDayMillis(day, zoneId)
-                    val dayEffective = records
-                        .filter { it.timestamp in startMs..endMs }
-                        .sumOf { it.countedVolumeMl(hydrationFactorsEnabled) }
+                    val dayEffective = dailyTotals[day] ?: 0.0
                     val dayTarget = allTargetsMap[dayIso] ?: defaultTargetMl
 
                     weekVolume += dayEffective
@@ -519,7 +587,7 @@ class AnalyticsViewModel @JvmOverloads constructor(
 
                 totalVolumeMl += weekVolume
                 ChartBarData(
-                    label = if (weeksAgo % 4 == 0) weekStart.format(DateTimeFormatter.ofPattern("MMM", Locale.getDefault())) else "",
+                    label = if (weeksAgo % 4 == 0) weekStart.format(monthFmt) else "",
                     valueMl = weekVolume / 7.0,
                     targetMl = weekTargetSum / 7.0,
                     isCurrent = (offset == 0 && weeksAgo == 0)

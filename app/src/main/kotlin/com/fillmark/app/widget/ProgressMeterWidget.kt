@@ -38,6 +38,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.fillmark.app.MainActivity
+import com.fillmark.app.R
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.FillmarkDatabase
@@ -104,13 +105,16 @@ class ProgressMeterWidget : GlanceAppWidget() {
             val percentDisplay = (rawRatio * 100).roundToInt()
 
             val pacing = if (hasTarget && prefs.wakingPacingEnabled) {
-                PacingCalculator.evaluatePacing(
+                val rawPacing = PacingCalculator.evaluatePacing(
                     currentTime = currentTime,
                     wakeTimeString = prefs.wakingHoursStart,
                     sleepTimeString = prefs.wakingHoursEnd,
                     currentVolumeMl = effectiveTotalMl,
                     dailyTargetMl = targetMl,
                     displayUnit = prefs.displayUnit
+                )
+                rawPacing.copy(
+                    statusText = PacingCalculator.formatStatusText(context, rawPacing, prefs.displayUnit)
                 )
             } else {
                 null
@@ -133,6 +137,9 @@ class ProgressMeterWidget : GlanceAppWidget() {
                 dynamicColor = prefs.dynamicColorEnabled
             ) {
                 ProgressMeterContent(
+                    appNameText = context.getString(R.string.app_name),
+                    todayLabel = context.getString(R.string.today),
+                    progressCd = context.getString(R.string.widget_progress_cd, percentDisplay),
                     hasTarget = hasTarget,
                     consumedText = VolumeConverter.formatVolume(effectiveTotalMl, prefs.displayUnit),
                     targetText = VolumeConverter.formatVolume(targetMl, prefs.displayUnit),
@@ -147,6 +154,9 @@ class ProgressMeterWidget : GlanceAppWidget() {
 
     @Composable
     private fun ProgressMeterContent(
+        appNameText: String,
+        todayLabel: String,
+        progressCd: String,
         hasTarget: Boolean,
         consumedText: String,
         targetText: String,
@@ -169,7 +179,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.Vertical.CenterVertically
             ) {
                 Text(
-                    text = "Fillmark",
+                    text = appNameText,
                     style = TextStyle(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -178,7 +188,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
                 )
                 Spacer(modifier = GlanceModifier.defaultWeight())
                 Text(
-                    text = if (hasTarget) "$percentDisplay%" else "Today",
+                    text = if (hasTarget) "$percentDisplay%" else todayLabel,
                     style = TextStyle(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
@@ -191,7 +201,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
 
             Image(
                 provider = ImageProvider(progressBitmap),
-                contentDescription = "Progress: $percentDisplay%",
+                contentDescription = progressCd,
                 contentScale = ContentScale.FillBounds,
                 modifier = GlanceModifier.fillMaxWidth().height(18.dp)
             )
@@ -235,7 +245,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
                                 text = pacing.statusText,
                                 maxLines = 1,
                                 style = TextStyle(
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = ColorProvider(textColor)
                                 )

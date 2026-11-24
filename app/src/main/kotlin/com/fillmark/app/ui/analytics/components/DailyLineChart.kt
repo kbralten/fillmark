@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,9 +37,6 @@ import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.domain.ChartPoint
 import com.fillmark.app.domain.DailyGraphMode
 import com.fillmark.app.domain.DailyLineChartData
-import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkNavy700
-import com.fillmark.app.ui.theme.FillmarkNavy900
 import kotlin.math.abs
 
 @Composable
@@ -50,15 +48,16 @@ fun DailyLineChart(
     val is24Hour = DateFormat.is24HourFormat(context)
     var selectedPoint by remember(data) { mutableStateOf<ChartPoint?>(null) }
 
+    val modeLabel = stringResource(data.mode.labelRes)
     val chartDescription = if (!data.hasEntries) {
         stringResource(R.string.analytics_linechart_empty_a11y)
     } else {
         val totalText = VolumeConverter.formatVolume(data.totalIntakeMl, data.displayUnit)
         if (data.hasTarget) {
             val targetText = VolumeConverter.formatVolume(data.targetVolumeMl, data.displayUnit)
-            stringResource(R.string.analytics_linechart_with_target_a11y, data.mode.label, totalText, targetText)
+            stringResource(R.string.analytics_linechart_with_target_a11y, modeLabel, totalText, targetText)
         } else {
-            stringResource(R.string.analytics_linechart_a11y, data.mode.label, totalText)
+            stringResource(R.string.analytics_linechart_a11y, modeLabel, totalText)
         }
     }
 
@@ -69,11 +68,15 @@ fun DailyLineChart(
         stringResource(R.string.analytics_empty_day)
     }
 
-    val trackColor = FillmarkNavy700
-    val targetLineColor = Color(0x80A5B9CC)
-    val paceLineColor = Color(0x9938BDF8)
-    val labelColorInt = Color(0xFF8094A8).toArgb()
-    val navy900Int = FillmarkNavy900.toArgb()
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onPrimaryInt = MaterialTheme.colorScheme.onPrimary.toArgb()
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val targetLineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+    val paceLineColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
+    val labelColorInt = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    val dotCenterColor = MaterialTheme.colorScheme.surface
+
+    val rateSuffixFormat = stringResource(R.string.unit_per_hour_suffix, VolumeConverter.formatVolume(data.targetRatePerHour, data.displayUnit))
 
     Canvas(
         modifier = modifier
@@ -127,7 +130,7 @@ fun DailyLineChart(
             return plotBottom - fraction * plotHeight
         }
 
-        // 1. Horizontal background baseline and faint gridlines
+        // 1. Horizontal background baseline
         drawLine(
             color = trackColor,
             start = Offset(plotLeft, plotBottom),
@@ -155,7 +158,7 @@ fun DailyLineChart(
         }
         val labelPaint = android.graphics.Paint().apply {
             color = labelColorInt
-            textSize = 10.5.sp.toPx()
+            textSize = 11.sp.toPx()
             typeface = android.graphics.Typeface.DEFAULT
             textAlign = android.graphics.Paint.Align.CENTER
             isAntiAlias = true
@@ -172,8 +175,8 @@ fun DailyLineChart(
         }
 
         val refLineTextPaint = android.graphics.Paint().apply {
-            color = Color(0xCC8CA3BA).toArgb()
-            textSize = 9.sp.toPx()
+            color = labelColorInt
+            textSize = 11.sp.toPx()
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             textAlign = android.graphics.Paint.Align.RIGHT
             isAntiAlias = true
@@ -181,7 +184,6 @@ fun DailyLineChart(
 
         // 3. Reference lines
         if (data.mode == DailyGraphMode.CUMULATIVE && data.hasTarget) {
-            // Horizontal reference line for target consumption
             val targetY = valToY(data.targetVolumeMl)
             drawLine(
                 color = targetLineColor,
@@ -191,16 +193,14 @@ fun DailyLineChart(
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()), 0f)
             )
 
-            // Horizontal target label
             val formattedTarget = VolumeConverter.formatVolume(data.targetVolumeMl, data.displayUnit)
             drawContext.canvas.nativeCanvas.drawText(
                 "$targetPrefixText $formattedTarget",
                 plotRight - 4.dp.toPx(),
-                (targetY - 4.dp.toPx()).coerceAtLeast(plotTop + 10.dp.toPx()),
+                (targetY - 4.dp.toPx()).coerceAtLeast(plotTop + 12.dp.toPx()),
                 refLineTextPaint
             )
 
-            // Sloped reference line for target consumption rate from wake to sleep
             val startHour = data.wakingHoursStart ?: 0.0f
             val endHour = data.wakingHoursEnd ?: 24.0f
             val startX = hourToX(startHour)
@@ -221,7 +221,6 @@ fun DailyLineChart(
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()), 0f)
             )
         } else if (data.mode == DailyGraphMode.RATE && data.hasTarget) {
-            // Horizontal reference line for target consumption rate
             val rateY = valToY(data.targetRatePerHour)
             drawLine(
                 color = targetLineColor,
@@ -231,11 +230,10 @@ fun DailyLineChart(
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()), 0f)
             )
 
-            val formattedRate = "${VolumeConverter.formatVolume(data.targetRatePerHour, data.displayUnit)}/h"
             drawContext.canvas.nativeCanvas.drawText(
-                "$targetPrefixText $formattedRate",
+                "$targetPrefixText $rateSuffixFormat",
                 plotRight - 4.dp.toPx(),
-                (rateY - 4.dp.toPx()).coerceAtLeast(plotTop + 10.dp.toPx()),
+                (rateY - 4.dp.toPx()).coerceAtLeast(plotTop + 12.dp.toPx()),
                 refLineTextPaint
             )
         }
@@ -257,7 +255,6 @@ fun DailyLineChart(
                 strokePath.lineTo(px, py)
             }
 
-            // Filled gradient under the sloped line
             val lastX = hourToX(points.last().hourOfDay)
             val fillPath = Path().apply {
                 addPath(strokePath)
@@ -270,18 +267,17 @@ fun DailyLineChart(
                 path = fillPath,
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        FillmarkCyan.copy(alpha = 0.25f),
-                        FillmarkCyan.copy(alpha = 0.01f)
+                        primaryColor.copy(alpha = 0.25f),
+                        primaryColor.copy(alpha = 0.01f)
                     ),
                     startY = plotTop,
                     endY = plotBottom
                 )
             )
 
-            // Sloped line stroke
             drawPath(
                 path = strokePath,
-                color = FillmarkCyan,
+                color = primaryColor,
                 style = Stroke(
                     width = 2.75.dp.toPx(),
                     cap = StrokeCap.Round,
@@ -289,26 +285,22 @@ fun DailyLineChart(
                 )
             )
 
-            // Draw point dots
             points.forEach { pt ->
                 val px = hourToX(pt.hourOfDay)
                 val py = valToY(pt.value)
 
-                // Outer halo
                 drawCircle(
-                    color = Color(0x3320D2DE),
+                    color = primaryColor.copy(alpha = 0.2f),
                     radius = 5.5.dp.toPx(),
                     center = Offset(px, py)
                 )
-                // Solid cyan circle
                 drawCircle(
-                    color = FillmarkCyan,
+                    color = primaryColor,
                     radius = 3.5.dp.toPx(),
                     center = Offset(px, py)
                 )
-                // Center white dot
                 drawCircle(
-                    color = Color.White,
+                    color = dotCenterColor,
                     radius = 1.5.dp.toPx(),
                     center = Offset(px, py)
                 )
@@ -318,7 +310,7 @@ fun DailyLineChart(
         // 5. Empty state label if no entries yet
         if (!data.hasEntries) {
             val emptyPaint = android.graphics.Paint().apply {
-                color = Color(0xFF6B7C8E).toArgb()
+                color = labelColorInt
                 textSize = 12.sp.toPx()
                 typeface = android.graphics.Typeface.DEFAULT
                 textAlign = android.graphics.Paint.Align.CENTER
@@ -338,33 +330,31 @@ fun DailyLineChart(
             val px = hourToX(activePoint.hourOfDay)
             val py = valToY(activePoint.value)
 
-            // Highlight ring for active point
             drawCircle(
-                color = Color(0x6620D2DE),
+                color = primaryColor.copy(alpha = 0.4f),
                 radius = 8.dp.toPx(),
                 center = Offset(px, py)
             )
 
-            // Badge pill
             val badgeText = activePoint.displayValue
             val badgePaint = android.graphics.Paint().apply {
-                color = navy900Int
-                textSize = 9.sp.toPx()
+                color = onPrimaryInt
+                textSize = 11.sp.toPx()
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
                 textAlign = android.graphics.Paint.Align.CENTER
                 isAntiAlias = true
             }
 
             val textWidth = badgePaint.measureText(badgeText)
-            val badgeWidth = textWidth + 14.dp.toPx()
-            val badgeHeight = 18.dp.toPx()
-            val badgeCorner = CornerRadius(9.dp.toPx(), 9.dp.toPx())
+            val badgeWidth = textWidth + 16.dp.toPx()
+            val badgeHeight = 20.dp.toPx()
+            val badgeCorner = CornerRadius(10.dp.toPx(), 10.dp.toPx())
 
             val badgeLeft = (px - badgeWidth / 2f).coerceIn(plotLeft, plotRight - badgeWidth)
             val badgeTop = (py - badgeHeight - 6.dp.toPx()).coerceIn(plotTop, plotBottom - badgeHeight)
 
             drawRoundRect(
-                color = FillmarkCyan,
+                color = primaryColor,
                 topLeft = Offset(badgeLeft, badgeTop),
                 size = Size(badgeWidth, badgeHeight),
                 cornerRadius = badgeCorner

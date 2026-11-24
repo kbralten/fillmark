@@ -37,6 +37,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.fillmark.app.MainActivity
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.VolumeConverter
@@ -85,7 +86,10 @@ class QuickLogBarWidget : GlanceAppWidget() {
                     presets = presets,
                     displayUnit = prefs.displayUnit,
                     canUndo = canUndo,
-                    isDark = isDark
+                    isDark = isDark,
+                    emptyText = context.getString(R.string.widget_tap_open),
+                    undoLabel = context.getString(R.string.action_undo),
+                    plusVolumeFormat = context.getString(R.string.quick_preset_plus_volume)
                 )
             }
         }
@@ -96,7 +100,10 @@ class QuickLogBarWidget : GlanceAppWidget() {
         presets: List<PresetEntity>,
         displayUnit: DisplayUnit,
         canUndo: Boolean,
-        isDark: Boolean
+        isDark: Boolean,
+        emptyText: String,
+        undoLabel: String,
+        plusVolumeFormat: String
     ) {
         Row(
             modifier = GlanceModifier
@@ -115,7 +122,7 @@ class QuickLogBarWidget : GlanceAppWidget() {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Tap to open Fillmark",
+                        text = emptyText,
                         style = TextStyle(fontSize = 12.sp, color = GlanceTheme.colors.onSurface)
                     )
                 }
@@ -149,23 +156,23 @@ class QuickLogBarWidget : GlanceAppWidget() {
                             Image(
                                 provider = ImageProvider(iconRes),
                                 contentDescription = preset.label,
-                                modifier = GlanceModifier.size(20.dp)
+                                modifier = GlanceModifier.size(18.dp)
                             )
                             Spacer(modifier = GlanceModifier.height(2.dp))
                             Text(
                                 text = preset.label,
                                 maxLines = 1,
                                 style = TextStyle(
-                                    fontSize = 9.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = GlanceTheme.colors.onSurface
                                 )
                             )
                             Text(
-                                text = "+$volumeStr",
+                                text = String.format(plusVolumeFormat, volumeStr),
                                 maxLines = 1,
                                 style = TextStyle(
-                                    fontSize = 8.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = ColorProvider(volumeTextColor)
                                 )
@@ -187,9 +194,9 @@ class QuickLogBarWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Undo",
+                            text = undoLabel,
                             style = TextStyle(
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = GlanceTheme.colors.onPrimaryContainer
                             )

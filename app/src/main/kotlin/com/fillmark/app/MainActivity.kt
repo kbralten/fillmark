@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -147,10 +148,12 @@ class MainActivity : ComponentActivity() {
         val openManual = intent?.getBooleanExtra(ShortcutHelper.EXTRA_OPEN_MANUAL_LOG, false) == true
         if (presetId != null) {
             pendingShortcutPresetId = presetId
+            ShortcutManagerCompat.reportShortcutUsed(this, "preset_$presetId")
             intent.removeExtra(ShortcutHelper.EXTRA_QUICK_LOG_PRESET_ID)
         }
         if (openManual) {
             pendingOpenManualLog = true
+            ShortcutManagerCompat.reportShortcutUsed(this, "manual_log")
             intent.removeExtra(ShortcutHelper.EXTRA_OPEN_MANUAL_LOG)
         }
     }

@@ -82,7 +82,6 @@ import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.ui.dashboard.components.ManualLogBottomSheet
 import com.fillmark.app.ui.history.components.EditLogDialog
-import com.fillmark.app.ui.theme.FillmarkCyan
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -252,7 +251,7 @@ fun HistoryScreen(
                                 FilterChip(
                                     selected = uiState.selectedDrinkType == type.id,
                                     onClick = { viewModel.setDrinkTypeFilter(type.id) },
-                                    label = { Text(type.displayName) }
+                                    label = { Text(stringResource(type.labelRes)) }
                                 )
                             }
                         }
@@ -358,10 +357,12 @@ fun HistoryScreen(
                     )
                 },
                 text = {
+                    val categoryName = stringResource(DrinkType.fromId(pendingRecord.drinkType).labelRes)
+                    val recordTitle = pendingRecord.label?.takeIf { it.isNotBlank() } ?: categoryName
                     Text(
                         text = stringResource(
                             R.string.history_delete_confirm_body,
-                            pendingRecord.displayTitle(),
+                            recordTitle,
                             VolumeConverter.formatVolume(
                                 pendingRecord.countedVolumeMl(uiState.hydrationFactorsEnabled),
                                 uiState.displayUnit
@@ -539,8 +540,8 @@ private fun HistoryRecordItem(
 ) {
     val context = LocalContext.current
     val is24Hour = DateFormat.is24HourFormat(context)
-    val title = record.displayTitle()
-    val categoryName = DrinkType.fromId(record.drinkType).displayName
+    val categoryName = stringResource(DrinkType.fromId(record.drinkType).labelRes)
+    val title = record.label?.takeIf { it.isNotBlank() } ?: categoryName
     val timeText = TimeUtils.formatTime(record.timestamp, is24Hour = is24Hour)
 
     Card(
@@ -561,7 +562,7 @@ private fun HistoryRecordItem(
         ) {
             Surface(
                 shape = CircleShape,
-                color = FillmarkCyan.copy(alpha = 0.15f),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                 modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {

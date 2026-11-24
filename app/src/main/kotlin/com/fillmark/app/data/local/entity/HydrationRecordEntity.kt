@@ -1,5 +1,6 @@
 package com.fillmark.app.data.local.entity
 
+import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
@@ -43,6 +44,11 @@ data class HydrationRecordEntity(
 
     fun displayTitle(): String {
         return label?.takeIf { it.isNotBlank() } ?: DrinkType.fromId(drinkType).displayName
+    }
+
+    fun localizedDisplayTitle(context: Context): String {
+        return label?.takeIf { it.isNotBlank() }
+            ?: context.getString(DrinkType.fromId(drinkType).labelRes)
     }
 }
 

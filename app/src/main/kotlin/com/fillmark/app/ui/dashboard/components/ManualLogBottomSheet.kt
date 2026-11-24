@@ -85,9 +85,9 @@ fun ManualLogBottomSheet(
     var isOverridden by remember { mutableStateOf(initialTimestampMillis != null) }
     var showDateTimePicker by remember { mutableStateOf(false) }
 
-    val volumeVal = volumeInput.toDoubleOrNull() ?: 0.0
+    val volumeVal = VolumeConverter.parseDecimalInput(volumeInput) ?: 0.0
     val internalMl = VolumeConverter.toInternalMl(volumeVal, selectedUnit)
-    val parsedFactor = hydrationFactorInput.toDoubleOrNull() ?: 0.0
+    val parsedFactor = VolumeConverter.parseDecimalInput(hydrationFactorInput) ?: 0.0
     val isFactorValid = !hydrationFactorsEnabled || VolumeConverter.isValidHydrationFactor(parsedFactor)
     val activeFactor = if (hydrationFactorsEnabled) {
         if (isFactorValid) parsedFactor else selectedDrinkType.defaultHydrationFactor
@@ -206,7 +206,7 @@ fun ManualLogBottomSheet(
                                 )
                             }
                         },
-                        label = { Text(type.displayName) },
+                        label = { Text(stringResource(type.labelRes)) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer

@@ -85,5 +85,37 @@ class VolumeConverterTest {
         assertEquals("250", VolumeConverter.sanitizeDecimalInput("250"))
         assertEquals("", VolumeConverter.sanitizeDecimalInput("abc"))
     }
+
+    @Test
+    fun testDecimalCommaLocales() {
+        val de = java.util.Locale.GERMANY
+        val fr = java.util.Locale.FRANCE
+
+        assertEquals(',', VolumeConverter.decimalSeparator(de))
+        assertEquals(',', VolumeConverter.decimalSeparator(fr))
+
+        // Parsing accepts both comma and dot inputs
+        assertEquals(16.5, VolumeConverter.parseDecimalInput("16,5")!!, 0.0001)
+        assertEquals(16.5, VolumeConverter.parseDecimalInput("16.5")!!, 0.0001)
+        assertEquals(0.5, VolumeConverter.parseDecimalInput(",5")!!, 0.0001)
+
+        // Sanitizing in decimal-comma locales emits locale separator and strips duplicates/alpha
+        assertEquals("16,5", VolumeConverter.sanitizeDecimalInput("16,5", de))
+        assertEquals("16,5", VolumeConverter.sanitizeDecimalInput("16.5", de))
+        assertEquals("12,34", VolumeConverter.sanitizeDecimalInput("12,3,4", fr))
+        assertEquals(",5", VolumeConverter.sanitizeDecimalInput(",,5", de))
+
+        // Formatting uses locale decimal separator
+        assertEquals("8,5 fl oz", VolumeConverter.formatVolume(251.375, DisplayUnit.IMPERIAL_FL_OZ, decimals = 1, locale = de))
+        assertEquals("8,5", VolumeConverter.formatInputNumber(251.375, DisplayUnit.IMPERIAL_FL_OZ, locale = de))
+        assertEquals("1,0", VolumeConverter.formatHydrationFactor(1.0, locale = de))
+        assertEquals("0,9", VolumeConverter.formatHydrationFactor(0.9, locale = fr))
+
+        // Unit conversion preserves decimal-comma formatting in Germany/France locales
+        val convertedOz = VolumeConverter.convertInputVolume("500", DisplayUnit.METRIC_ML, DisplayUnit.IMPERIAL_FL_OZ, locale = de)
+        assertEquals("16,9", convertedOz)
+        val backToMl = VolumeConverter.convertInputVolume("16,5", DisplayUnit.IMPERIAL_FL_OZ, DisplayUnit.METRIC_ML, locale = de)
+        assertEquals("488", backToMl)
+    }
 }
 
