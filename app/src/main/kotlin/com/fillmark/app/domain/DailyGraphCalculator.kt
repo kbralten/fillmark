@@ -1,5 +1,7 @@
 package com.fillmark.app.domain
 
+import androidx.annotation.StringRes
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
@@ -8,9 +10,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-enum class DailyGraphMode(val label: String) {
-    CUMULATIVE("Cumulative"),
-    RATE("Rate")
+enum class DailyGraphMode(val label: String, @param:StringRes val labelRes: Int) {
+    CUMULATIVE("Cumulative", R.string.analytics_mode_cumulative),
+    RATE("Rate", R.string.analytics_mode_rate)
 }
 
 data class ChartPoint(

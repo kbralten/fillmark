@@ -35,30 +35,26 @@
     </LinearLayout>
 
     <!-- Progress Bar -->
-    <FrameLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="14dp"
         android:layout_marginTop="5dp"
         android:layout_marginBottom="5dp"
-        android:background="@drawable/widget_preview_track_bg">
+        android:background="@drawable/widget_preview_track_bg"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <View
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:orientation="horizontal">
+            android:layout_weight="68"
+            android:background="@drawable/widget_preview_progress_fill" />
 
-            <FrameLayout
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="68"
-                android:background="@drawable/widget_preview_progress_fill" />
-
-            <FrameLayout
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="32" />
-        </LinearLayout>
-    </FrameLayout>
+        <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="32" />
+    </LinearLayout>
 
     <!-- Volume & Pacing Status -->
     <LinearLayout
@@ -101,13 +97,13 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_on_track"
                 android:textColor="#7DE6C0"
-                android:textSize="9.5sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
 
     <!-- Spacer -->
-    <FrameLayout
+    <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
@@ -117,6 +113,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
+        android:baselineAligned="false"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -144,7 +141,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_glass"
                 android:textColor="#FFFFFF"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -153,7 +150,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_glass_vol"
                 android:textColor="#20D2DE"
-                android:textSize="8sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -182,7 +179,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_bottle"
                 android:textColor="#FFFFFF"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -191,7 +188,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_bottle_vol"
                 android:textColor="#38BDF8"
-                android:textSize="8sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -220,7 +217,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_mug"
                 android:textColor="#FFFFFF"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -229,7 +226,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_mug_vol"
                 android:textColor="#FFB74D"
-                android:textSize="8sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -258,7 +255,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_tumbler"
                 android:textColor="#FFFFFF"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -267,7 +264,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_tumbler_vol"
                 android:textColor="#4ADE80"
-                android:textSize="8sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -296,7 +293,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_can"
                 android:textColor="#FFFFFF"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -305,7 +302,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_preview_preset_can_vol"
                 android:textColor="#C084FC"
-                android:textSize="8sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>

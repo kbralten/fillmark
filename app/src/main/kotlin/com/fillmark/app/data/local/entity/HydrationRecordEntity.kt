@@ -1,9 +1,11 @@
 package com.fillmark.app.data.local.entity
 
+import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.fillmark.app.core.DrinkType
 import java.util.UUID
 
 @Entity(
@@ -30,12 +32,23 @@ data class HydrationRecordEntity(
     @ColumnInfo(name = "last_modified")
     val lastModified: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "last_synced", defaultValue = "0")
-    val lastSynced: Long = 0L
+    val lastSynced: Long = 0L,
+    @ColumnInfo(name = "label")
+    val label: String? = null
 ) {
     val effectiveVolumeMl: Double
         get() = volumeMl * hydrationFactor
 
     fun countedVolumeMl(factorsEnabled: Boolean): Double =
         if (factorsEnabled) effectiveVolumeMl else volumeMl
+
+    fun displayTitle(): String {
+        return label?.takeIf { it.isNotBlank() } ?: DrinkType.fromId(drinkType).displayName
+    }
+
+    fun localizedDisplayTitle(context: Context): String {
+        return label?.takeIf { it.isNotBlank() }
+            ?: context.getString(DrinkType.fromId(drinkType).labelRes)
+    }
 }
 

@@ -1,5 +1,7 @@
 package com.fillmark.app.domain
 
+import android.content.Context
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
@@ -102,5 +104,23 @@ object PacingCalculator {
             status = status,
             statusText = statusText
         )
+    }
+
+    fun formatStatusText(
+        context: Context,
+        result: PacingResult,
+        displayUnit: DisplayUnit
+    ): String {
+        return when (result.status) {
+            PacingStatus.AHEAD -> context.getString(
+                R.string.pacing_ahead,
+                VolumeConverter.formatVolume(result.volumeDifferenceMl, displayUnit)
+            )
+            PacingStatus.ON_TRACK -> context.getString(R.string.pacing_on_track)
+            PacingStatus.BEHIND -> context.getString(
+                R.string.pacing_behind,
+                VolumeConverter.formatVolume(abs(result.volumeDifferenceMl), displayUnit)
+            )
+        }
     }
 }

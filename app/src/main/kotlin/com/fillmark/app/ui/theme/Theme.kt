@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
+internal val DarkColorScheme = darkColorScheme(
     primary = primaryDark,
     onPrimary = FillmarkNavy900,
     primaryContainer = primaryContainerDark,
@@ -40,7 +40,7 @@ private val DarkColorScheme = darkColorScheme(
     outlineVariant = Color(0xFF1B3145)
 )
 
-private val LightColorScheme = lightColorScheme(
+internal val LightColorScheme = lightColorScheme(
     primary = primaryLight,
     onPrimary = Color.White,
     primaryContainer = primaryContainerLight,

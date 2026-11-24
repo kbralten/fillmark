@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.text.format.DateFormat
+import androidx.core.net.toUri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -50,16 +52,21 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.HealthConnectClient
@@ -73,6 +80,7 @@ import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.ThemeMode
 import com.fillmark.app.sync.HealthConnectManager
+import com.fillmark.app.ui.common.DailyGoalEstimatorDialog
 import java.time.LocalDate
 import java.util.Locale
 
@@ -101,12 +109,27 @@ fun SettingsScreen(
         onPauseOrDispose {}
     }
 
+    var pendingInboundEnableOnReadGrant by remember { mutableStateOf(false) }
+
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) { grantedPermissions ->
         viewModel.refreshHealthConnectStatus()
-        if (grantedPermissions.containsAll(hcManager.permissions)) {
-            viewModel.setHealthConnectSync(enabled = true, bidirectional = uiState.healthConnectBidirectional)
+        val hasWrite = hcManager.writePermission in grantedPermissions
+        val hasRead = hcManager.readPermission in grantedPermissions
+        if (hasWrite && !uiState.healthConnectSyncEnabled) {
+            viewModel.setHealthConnectSync(
+                enabled = true,
+                bidirectional = uiState.healthConnectBidirectional && hasRead
+            )
+        } else if (hasRead && pendingInboundEnableOnReadGrant) {
+            pendingInboundEnableOnReadGrant = false
+            viewModel.setHealthConnectSync(
+                enabled = uiState.healthConnectSyncEnabled || hasWrite,
+                bidirectional = true
+            )
+        } else {
+            pendingInboundEnableOnReadGrant = false
         }
     }
 
@@ -130,30 +153,47 @@ fun SettingsScreen(
         if (uri != null) viewModel.exportLogsCsv(uri)
     }
 
+    val focusManager = LocalFocusManager.current
     val hasTarget = uiState.defaultTargetMl > 0
-    var targetInput by remember {
-        mutableStateOf(
-            if (uiState.defaultTargetMl > 0) {
-                VolumeConverter.formatInputNumber(uiState.defaultTargetMl, uiState.displayUnit)
-            } else {
-                if (uiState.displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
-            }
+    val targetInputState = remember {
+        DailyTargetInputState(
+            initialTargetMl = uiState.defaultTargetMl,
+            initialUnit = uiState.displayUnit,
+            initialHasTarget = hasTarget,
+            initialRevision = uiState.dataRevision
         )
     }
-    var lastObservedUnit by remember { mutableStateOf(uiState.displayUnit) }
-    var lastObservedHasTarget by remember { mutableStateOf(hasTarget) }
 
-    LaunchedEffect(uiState.displayUnit, hasTarget, uiState.defaultTargetMl) {
-        if (lastObservedUnit != uiState.displayUnit || lastObservedHasTarget != hasTarget) {
-            if (hasTarget) {
-                targetInput = VolumeConverter.formatInputNumber(uiState.defaultTargetMl, uiState.displayUnit)
-            }
-            lastObservedUnit = uiState.displayUnit
-            lastObservedHasTarget = hasTarget
+    LaunchedEffect(uiState.displayUnit, hasTarget, uiState.defaultTargetMl, uiState.dataRevision) {
+        targetInputState.syncFromExternal(
+            defaultTargetMl = uiState.defaultTargetMl,
+            displayUnit = uiState.displayUnit,
+            hasTarget = hasTarget,
+            dataRevision = uiState.dataRevision
+        )
+    }
+
+    val latestUnit by rememberUpdatedState(uiState.displayUnit)
+    val latestSavedTargetMl by rememberUpdatedState(uiState.defaultTargetMl)
+    val latestHasTarget by rememberUpdatedState(hasTarget)
+
+    fun commitPendingTarget() {
+        if (!latestHasTarget || !targetInputState.isDirty) return
+        targetInputState.commitIfValid(
+            displayUnit = latestUnit,
+            savedTargetMl = latestSavedTargetMl,
+            onCommit = { viewModel.setDefaultTargetMl(it) }
+        )
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            commitPendingTarget()
         }
     }
 
-    val parsedTarget = targetInput.toDoubleOrNull() ?: 0.0
+    val targetInput = targetInputState.text
+    val parsedTarget = VolumeConverter.parseDecimalInput(targetInput) ?: 0.0
     val targetInternalMl = VolumeConverter.toInternalMl(parsedTarget, uiState.displayUnit)
     val targetErrorText = when {
         !hasTarget -> null
@@ -164,9 +204,11 @@ fun SettingsScreen(
         )
         else -> null
     }
+    var targetFieldWasFocused by remember { mutableStateOf(false) }
 
     var showWakeTimePicker by remember { mutableStateOf(false) }
     var showSleepTimePicker by remember { mutableStateOf(false) }
+    var showEstimatorDialog by remember { mutableStateOf(false) }
 
     val privacyUrl = stringResource(R.string.privacy_policy_url)
     val githubIssuesUrl = stringResource(R.string.github_issues_url)
@@ -218,7 +260,7 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = uiState.themeMode == mode,
                                 onClick = { viewModel.setThemeMode(mode) },
-                                label = { Text(mode.label) }
+                                label = { Text(stringResource(mode.labelRes)) }
                             )
                         }
                     }
@@ -318,11 +360,13 @@ fun SettingsScreen(
                             onCheckedChange = { isChecked ->
                                 if (isChecked) {
                                     val defaultValInUnit = if (uiState.displayUnit == DisplayUnit.METRIC_ML) 2500.0 else 85.0
-                                    targetInput = if (uiState.displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
-                                    lastObservedHasTarget = true
+                                    targetInputState.setDisplayText(
+                                        if (uiState.displayUnit == DisplayUnit.METRIC_ML) "2500" else "85"
+                                    )
+                                    targetInputState.markExternalTargetChange(true)
                                     viewModel.setDefaultTarget(defaultValInUnit)
                                 } else {
-                                    lastObservedHasTarget = false
+                                    targetInputState.markExternalTargetChange(false)
                                     viewModel.setDefaultTargetMl(0.0)
                                 }
                             }
@@ -334,24 +378,53 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = targetInput,
                             onValueChange = { raw ->
-                                val sanitized = VolumeConverter.sanitizeDecimalInput(raw)
-                                targetInput = sanitized
-                                val num = sanitized.toDoubleOrNull()
-                                if (num != null) {
-                                    val ml = VolumeConverter.toInternalMl(num, uiState.displayUnit)
-                                    if (ml > 0 && ml <= VolumeConverter.MAX_DAILY_TARGET_ML) {
-                                        viewModel.setDefaultTargetMl(ml)
-                                    }
-                                }
+                                targetInputState.onTextChanged(raw, uiState.displayUnit) {}
                             },
                             label = { Text(stringResource(R.string.settings_daily_target_label)) },
                             suffix = { Text(uiState.displayUnit.symbol) },
+                            trailingIcon = if (targetInputState.isDirty && targetErrorText == null) {
+                                {
+                                    TextButton(
+                                        onClick = {
+                                            commitPendingTarget()
+                                            focusManager.clearFocus()
+                                        }
+                                    ) {
+                                        Text(stringResource(R.string.action_apply))
+                                    }
+                                }
+                            } else {
+                                null
+                            },
                             singleLine = true,
                             isError = targetErrorText != null,
                             supportingText = targetErrorText?.let { msg -> { Text(msg) } },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.fillMaxWidth()
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    commitPendingTarget()
+                                    focusManager.clearFocus()
+                                }
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    if (targetFieldWasFocused && !focusState.isFocused) {
+                                        commitPendingTarget()
+                                    }
+                                    targetFieldWasFocused = focusState.isFocused
+                                }
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(
+                            onClick = { showEstimatorDialog = true },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text(stringResource(R.string.estimator_button))
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -464,6 +537,10 @@ fun SettingsScreen(
                         text = when {
                             uiState.isHealthConnectAvailable && uiState.hasHealthConnectPermissions ->
                                 stringResource(R.string.settings_hc_connected)
+                            uiState.isHealthConnectAvailable && uiState.hasHealthConnectWritePermission ->
+                                stringResource(R.string.settings_hc_connected_outbound_only)
+                            uiState.isHealthConnectAvailable && uiState.hasHealthConnectReadPermission ->
+                                stringResource(R.string.settings_hc_connected_read_only)
                             uiState.isHealthConnectAvailable ->
                                 stringResource(R.string.settings_hc_needs_perms)
                             uiState.healthConnectSdkStatus == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
@@ -472,7 +549,7 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_hc_unavailable)
                         },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (uiState.hasHealthConnectPermissions) {
+                        color = if (uiState.hasHealthConnectWritePermission) {
                             MaterialTheme.colorScheme.primary
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -482,30 +559,12 @@ fun SettingsScreen(
                     if (uiState.healthConnectSdkStatus == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
-                            onClick = {
-                                val marketIntent = Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("market://details?id=com.google.android.apps.healthdata")
-                                ).apply {
-                                    setPackage("com.android.vending")
-                                }
-                                runCatching { context.startActivity(marketIntent) }
-                                    .onFailure {
-                                        runCatching {
-                                            context.startActivity(
-                                                Intent(
-                                                    Intent.ACTION_VIEW,
-                                                    Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata")
-                                                )
-                                            )
-                                        }
-                                    }
-                            },
+                            onClick = { HealthConnectManager.openPlayStore(context) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.settings_hc_install_update))
                         }
-                    } else if (uiState.isHealthConnectAvailable && !uiState.hasHealthConnectPermissions) {
+                    } else if (uiState.isHealthConnectAvailable && !uiState.hasHealthConnectWritePermission) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = {
@@ -513,11 +572,17 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(stringResource(R.string.settings_hc_grant_perms))
+                            Text(
+                                if (uiState.hasHealthConnectReadPermission) {
+                                    stringResource(R.string.settings_hc_grant_write_perm)
+                                } else {
+                                    stringResource(R.string.settings_hc_grant_perms)
+                                }
+                            )
                         }
                     }
 
-                    if (uiState.isHealthConnectAvailable && uiState.hasHealthConnectPermissions) {
+                    if (uiState.isHealthConnectAvailable && uiState.hasHealthConnectWritePermission) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -532,7 +597,10 @@ fun SettingsScreen(
                             Switch(
                                 checked = uiState.healthConnectSyncEnabled,
                                 onCheckedChange = { enabled ->
-                                    viewModel.setHealthConnectSync(enabled, uiState.healthConnectBidirectional)
+                                    viewModel.setHealthConnectSync(
+                                        enabled,
+                                        uiState.healthConnectBidirectional && uiState.hasHealthConnectReadPermission
+                                    )
                                 }
                             )
                         }
@@ -551,18 +619,40 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = stringResource(R.string.settings_hc_inbound_sync_desc),
+                                    text = if (uiState.hasHealthConnectReadPermission) {
+                                        stringResource(R.string.settings_hc_inbound_sync_desc)
+                                    } else {
+                                        stringResource(R.string.settings_hc_inbound_needs_read)
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             Switch(
-                                checked = uiState.healthConnectBidirectional,
+                                checked = uiState.healthConnectBidirectional && uiState.hasHealthConnectReadPermission,
                                 enabled = uiState.healthConnectSyncEnabled,
                                 onCheckedChange = { bi ->
-                                    viewModel.setHealthConnectSync(uiState.healthConnectSyncEnabled, bi)
+                                    if (bi && !uiState.hasHealthConnectReadPermission) {
+                                        pendingInboundEnableOnReadGrant = true
+                                        requestPermissionsLauncher.launch(setOf(hcManager.readPermission))
+                                    } else {
+                                        viewModel.setHealthConnectSync(uiState.healthConnectSyncEnabled, bi)
+                                    }
                                 }
                             )
+                        }
+
+                        if (!uiState.hasHealthConnectReadPermission) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    pendingInboundEnableOnReadGrant = true
+                                    requestPermissionsLauncher.launch(setOf(hcManager.readPermission))
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.settings_hc_grant_read_perm))
+                            }
                         }
 
                         if (uiState.healthConnectSyncEnabled) {
@@ -774,7 +864,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, privacyUrl.toUri()))
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -784,7 +874,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(githubIssuesUrl)))
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, githubIssuesUrl.toUri()))
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -825,6 +915,20 @@ fun SettingsScreen(
             onConfirm = { newTime ->
                 viewModel.setWakingSchedule(uiState.wakingHoursStart, newTime, uiState.wakingPacingEnabled)
                 showSleepTimePicker = false
+            }
+        )
+    }
+
+    if (showEstimatorDialog) {
+        DailyGoalEstimatorDialog(
+            displayUnit = uiState.displayUnit,
+            onDismiss = { showEstimatorDialog = false },
+            onApplyEstimateMl = { estimatedMl ->
+                targetInputState.setDisplayText(
+                    VolumeConverter.formatInputNumber(estimatedMl, uiState.displayUnit)
+                )
+                viewModel.setDefaultTargetMl(estimatedMl)
+                showEstimatorDialog = false
             }
         )
     }
@@ -899,7 +1003,7 @@ fun SettingsScreen(
                 OutlinedButton(
                     onClick = {
                         runCatching {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(githubRepoUrl)))
+                            context.startActivity(Intent(Intent.ACTION_VIEW, githubRepoUrl.toUri()))
                         }
                     }
                 ) {

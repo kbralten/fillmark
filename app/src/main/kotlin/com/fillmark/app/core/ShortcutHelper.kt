@@ -8,6 +8,7 @@ import androidx.core.graphics.drawable.IconCompat
 import com.fillmark.app.MainActivity
 import com.fillmark.app.R
 import com.fillmark.app.data.local.FillmarkDatabase
+import com.fillmark.app.data.local.UserPreferencesRepository
 import kotlinx.coroutines.flow.first
 
 object ShortcutHelper {
@@ -18,7 +19,7 @@ object ShortcutHelper {
         runCatching {
             val db = FillmarkDatabase.getInstance(context)
             val presets = db.presetDao().getAllPresets()
-            val prefs = com.fillmark.app.data.local.UserPreferencesRepository(context).preferencesFlow.first()
+            val prefs = UserPreferencesRepository(context).preferencesFlow.first()
 
             val shortcuts = mutableListOf<ShortcutInfoCompat>()
 
@@ -31,8 +32,12 @@ object ShortcutHelper {
                 }
                 shortcuts.add(
                     ShortcutInfoCompat.Builder(context, "preset_${preset.id}")
-                        .setShortLabel("${preset.label} (+$volText)".take(25))
-                        .setLongLabel("Log ${preset.label} ($volText)")
+                        .setShortLabel(
+                            context.getString(R.string.shortcut_preset_short, preset.label, volText).take(25)
+                        )
+                        .setLongLabel(
+                            context.getString(R.string.shortcut_preset_long, preset.label, volText)
+                        )
                         .setIcon(IconCompat.createWithResource(context, PresetIcon.getDrawableRes(preset.iconKey)))
                         .setIntent(intent)
                         .build()
@@ -46,8 +51,8 @@ object ShortcutHelper {
             }
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, "manual_log")
-                    .setShortLabel("Custom Drink")
-                    .setLongLabel("Log Custom Drink")
+                    .setShortLabel(context.getString(R.string.shortcut_manual_short))
+                    .setLongLabel(context.getString(R.string.shortcut_manual_long))
                     .setIcon(IconCompat.createWithResource(context, R.drawable.ic_preset_glass))
                     .setIntent(manualIntent)
                     .build()

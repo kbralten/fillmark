@@ -15,6 +15,10 @@ class WidgetMidnightReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
+        if (intent?.action != ACTION_MIDNIGHT_RESET) {
+            Log.w(TAG, "Ignoring unexpected action: ${intent?.action}")
+            return
+        }
         handleWidgetRefreshBroadcast(context, intent, TAG)
     }
 }
@@ -25,6 +29,16 @@ class WidgetSystemEventReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
+        val action = intent?.action
+        if (
+            action != Intent.ACTION_DATE_CHANGED &&
+            action != Intent.ACTION_TIME_CHANGED &&
+            action != Intent.ACTION_TIMEZONE_CHANGED &&
+            action != Intent.ACTION_BOOT_COMPLETED
+        ) {
+            Log.w(TAG, "Ignoring unallowed broadcast action: $action")
+            return
+        }
         handleWidgetRefreshBroadcast(context, intent, TAG)
     }
 }
@@ -48,7 +62,7 @@ private fun BroadcastReceiver.handleWidgetRefreshBroadcast(
         } catch (e: Exception) {
             Log.w(tag, "Error updating widgets on broadcast", e)
         } finally {
-            pendingResult.finish()
+            pendingResult?.finish()
         }
     }
 }

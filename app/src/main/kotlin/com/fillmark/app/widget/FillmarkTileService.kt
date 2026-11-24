@@ -1,10 +1,9 @@
 package com.fillmark.app.widget
 
-import android.content.Intent
-import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import android.widget.Toast
+import com.fillmark.app.R
 import com.fillmark.app.core.TimeUtils
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.FillmarkDatabase
@@ -13,6 +12,7 @@ import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.sync.HealthConnectManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
@@ -23,35 +23,38 @@ import java.util.UUID
 
 class FillmarkTileService : TileService() {
 
-    private var serviceScope: CoroutineScope? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var listenJob: Job? = null
 
     override fun onStartListening() {
         super.onStartListening()
-        serviceScope?.cancel()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        serviceScope = scope
-        scope.launch {
+        listenJob?.cancel()
+        listenJob = serviceScope.launch {
             refreshTileState()
         }
     }
 
     override fun onStopListening() {
         super.onStopListening()
-        serviceScope?.cancel()
-        serviceScope = null
+        listenJob?.cancel()
+        listenJob = null
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
     }
 
     override fun onClick() {
         super.onClick()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        scope.launch {
+        serviceScope.launch {
             val database = FillmarkDatabase.getInstance(applicationContext)
             val prefsRepo = UserPreferencesRepository(applicationContext)
             val prefs = prefsRepo.preferencesFlow.first()
             val topPreset = database.presetDao().getAllPresets().firstOrNull()
 
             val volumeMl = topPreset?.volumeMl ?: 250.0
-            val label = topPreset?.label ?: "Water"
+            val label = topPreset?.label ?: getString(R.string.drink_type_water)
             val factor = topPreset?.hydrationFactor ?: 1.0
             val drinkType = topPreset?.drinkType ?: "WATER"
             val iconKey = topPreset?.iconKey
@@ -63,7 +66,8 @@ class FillmarkTileService : TileService() {
                 hydrationFactor = factor,
                 drinkType = drinkType,
                 iconKey = iconKey,
-                lastModified = System.currentTimeMillis()
+                lastModified = System.currentTimeMillis(),
+                label = topPreset?.label
             )
             database.hydrationDao().insertRecord(record)
 
@@ -76,7 +80,7 @@ class FillmarkTileService : TileService() {
             withContext(Dispatchers.Main) {
                 Toast.makeText(
                     applicationContext,
-                    "Logged +$volStr ($label)",
+                    getString(R.string.widget_logged_toast, volStr, label),
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -110,13 +114,11 @@ class FillmarkTileService : TileService() {
             withContext(Dispatchers.Main) {
                 tile.state = Tile.STATE_ACTIVE
                 tile.label = if (topPreset != null) {
-                    "Log ${topPreset.label}"
+                    getString(R.string.tile_log_preset, topPreset.label)
                 } else {
-                    "Log Water"
+                    getString(R.string.tile_log_water_label)
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    tile.subtitle = subtitleText
-                }
+                tile.subtitle = subtitleText
                 tile.updateTile()
             }
         }

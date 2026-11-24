@@ -1,8 +1,13 @@
 package com.fillmark.app.ui.dashboard.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -13,20 +18,27 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,10 +61,9 @@ import androidx.compose.ui.unit.dp
 import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.VolumeConverter
+import com.fillmark.app.domain.GoalMilestoneTracker
 import com.fillmark.app.domain.PacingResult
 import com.fillmark.app.domain.PacingStatus
-import com.fillmark.app.ui.theme.FillmarkCyan
-import com.fillmark.app.ui.theme.FillmarkIndigo
 import com.fillmark.app.ui.theme.PaceAheadBg
 import com.fillmark.app.ui.theme.PaceAheadBgDark
 import com.fillmark.app.ui.theme.PaceAheadBorder
@@ -90,6 +101,22 @@ fun FluidProgressMeter(
     onTargetClick: (() -> Unit)? = null
 ) {
     val hasTarget = targetMl > 0
+    val goalReached = GoalMilestoneTracker.isGoalReached(effectiveVolumeMl, targetMl)
+    var previousVolumeMl by remember { mutableDoubleStateOf(effectiveVolumeMl) }
+    val celebrationPulse = remember { Animatable(0f) }
+
+    LaunchedEffect(effectiveVolumeMl, targetMl) {
+        if (GoalMilestoneTracker.didCrossDailyGoal(previousVolumeMl, effectiveVolumeMl, targetMl)) {
+            celebrationPulse.snapTo(0f)
+            celebrationPulse.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
+            )
+            celebrationPulse.snapTo(0f)
+        }
+        previousVolumeMl = effectiveVolumeMl
+    }
+
     val progressRatio = if (hasTarget) (effectiveVolumeMl / targetMl).toFloat() else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progressRatio.coerceIn(0f, 2f),
@@ -105,8 +132,10 @@ fun FluidProgressMeter(
     )
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val trackColor = if (isDark) Color(0xFF1A2F44) else Color(0xFFE2EAF1)
-    val pacingTrackColor = if (isDark) Color(0xFF2B587E) else FillmarkIndigo
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val pacingTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = if (isDark) 0.55f else 0.72f)
+    val gaugePrimaryColor = MaterialTheme.colorScheme.primary
+    val gaugeOverflowColor = MaterialTheme.colorScheme.tertiary
     val primaryTextColor = MaterialTheme.colorScheme.onBackground
     val mutedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -187,8 +216,8 @@ fun FluidProgressMeter(
                         path = backWave,
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                FillmarkCyan.copy(alpha = 0.18f),
-                                FillmarkCyan.copy(alpha = 0.04f)
+                                gaugePrimaryColor.copy(alpha = 0.18f),
+                                gaugePrimaryColor.copy(alpha = 0.04f)
                             ),
                             startY = waveBaseY - 20.dp.toPx(),
                             endY = centerOffset.y + innerRadius
@@ -211,8 +240,8 @@ fun FluidProgressMeter(
                         path = frontWave,
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                FillmarkCyan.copy(alpha = 0.30f),
-                                FillmarkCyan.copy(alpha = 0.08f)
+                                gaugePrimaryColor.copy(alpha = 0.30f),
+                                gaugePrimaryColor.copy(alpha = 0.08f)
                             ),
                             startY = waveBaseY - 10.dp.toPx(),
                             endY = centerOffset.y + innerRadius
@@ -246,11 +275,11 @@ fun FluidProgressMeter(
                         )
                     }
 
-                    // Dual-progress gauge layer 2: Bright Cyan/Teal logged intake arc
+                    // Dual-progress gauge layer 2: Primary logged intake arc
                     if (animatedProgress > 0.005f) {
                         val intakeSweep = (animatedProgress.coerceAtMost(1f) * 360f).coerceIn(4f, 360f)
                         drawArc(
-                            color = FillmarkCyan,
+                            color = gaugePrimaryColor,
                             startAngle = -90f,
                             sweepAngle = intakeSweep,
                             useCenter = false,
@@ -264,13 +293,25 @@ fun FluidProgressMeter(
                     if (animatedProgress > 1f) {
                         val overflowSweep = ((animatedProgress - 1f).coerceIn(0f, 1f) * 360f)
                         drawArc(
-                            color = Color(0xFF00E5FF),
+                            color = gaugeOverflowColor,
                             startAngle = -90f,
                             sweepAngle = overflowSweep,
                             useCenter = false,
                             topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
                             size = Size(radius * 2, radius * 2),
                             style = Stroke(width = strokeWidth + 3.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
+
+                    // One-shot celebration burst ring when crossing 100%
+                    val pulse = celebrationPulse.value
+                    if (pulse > 0f && pulse < 1f) {
+                        val burstRadius = radius + (14.dp.toPx() * pulse)
+                        drawCircle(
+                            color = gaugePrimaryColor.copy(alpha = (1f - pulse) * 0.55f),
+                            radius = burstRadius,
+                            center = centerOffset,
+                            style = Stroke(width = (6.dp.toPx() * (1f - pulse)).coerceAtLeast(1f))
                         )
                     }
                 }
@@ -305,6 +346,8 @@ fun FluidProgressMeter(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = if (onTargetClick != null) {
                             Modifier
+                                .widthIn(min = 48.dp)
+                                .heightIn(min = 48.dp)
                                 .clickable(onClick = onTargetClick)
                                 .padding(horizontal = 8.dp, vertical = 6.dp)
                         } else {
@@ -364,6 +407,8 @@ fun FluidProgressMeter(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier
+                                .widthIn(min = 48.dp)
+                                .heightIn(min = 48.dp)
                                 .clickable(onClick = onTargetClick)
                                 .padding(horizontal = 8.dp, vertical = 6.dp)
                         ) {
@@ -380,6 +425,38 @@ fun FluidProgressMeter(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = goalReached,
+            enter = fadeIn() + scaleIn(initialScale = 0.85f),
+            exit = fadeOut()
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = if (isDark) PaceAheadBgDark else PaceAheadBg,
+                border = BorderStroke(1.dp, if (isDark) PaceAheadBorderDark else PaceAheadBorder),
+                modifier = Modifier.padding(top = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.EmojiEvents,
+                        contentDescription = null,
+                        tint = if (isDark) PaceAheadIconDark else PaceAheadIcon,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.meter_goal_reached_badge),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) PaceAheadTextDark else PaceAheadText
+                    )
                 }
             }
         }

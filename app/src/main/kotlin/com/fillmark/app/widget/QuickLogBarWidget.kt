@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.actionParametersOf
@@ -27,7 +28,6 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
@@ -37,6 +37,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.fillmark.app.MainActivity
+import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.PresetIcon
 import com.fillmark.app.core.VolumeConverter
@@ -63,14 +64,34 @@ class QuickLogBarWidget : GlanceAppWidget() {
                 prefsRepo.preferencesFlow
             }.collectAsState(initial = initialPrefs)
 
-            val canUndo = prefs.lastWidgetLogRecordId != null &&
-                (System.currentTimeMillis() - prefs.lastWidgetLogTimeMillis) <= 30_000L
-
-            QuickLogBarContent(
-                presets = presets,
-                displayUnit = prefs.displayUnit,
-                canUndo = canUndo
+            val canUndo by remember(prefs.lastWidgetLogRecordId, prefs.lastWidgetLogTimeMillis) {
+                WidgetTimingHelper.observeCanUndo(
+                    lastRecordId = prefs.lastWidgetLogRecordId,
+                    lastLogTimeMillis = prefs.lastWidgetLogTimeMillis
+                )
+            }.collectAsState(
+                initial = WidgetTimingHelper.isUndoAvailable(
+                    lastRecordId = prefs.lastWidgetLogRecordId,
+                    lastLogTimeMillis = prefs.lastWidgetLogTimeMillis
+                )
             )
+
+            val isDark = resolveWidgetIsDark(context, prefs.themeMode)
+
+            FillmarkWidgetTheme(
+                themeMode = prefs.themeMode,
+                dynamicColor = prefs.dynamicColorEnabled
+            ) {
+                QuickLogBarContent(
+                    presets = presets,
+                    displayUnit = prefs.displayUnit,
+                    canUndo = canUndo,
+                    isDark = isDark,
+                    emptyText = context.getString(R.string.widget_tap_open),
+                    undoLabel = context.getString(R.string.action_undo),
+                    plusVolumeFormat = context.getString(R.string.quick_preset_plus_volume)
+                )
+            }
         }
     }
 
@@ -78,12 +99,16 @@ class QuickLogBarWidget : GlanceAppWidget() {
     private fun QuickLogBarContent(
         presets: List<PresetEntity>,
         displayUnit: DisplayUnit,
-        canUndo: Boolean
+        canUndo: Boolean,
+        isDark: Boolean,
+        emptyText: String,
+        undoLabel: String,
+        plusVolumeFormat: String
     ) {
         Row(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(ColorProvider(Color(0xF0182432)))
+                .background(GlanceTheme.colors.widgetBackground)
                 .cornerRadius(22.dp)
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Vertical.CenterVertically,
@@ -97,19 +122,18 @@ class QuickLogBarWidget : GlanceAppWidget() {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Tap to open Fillmark",
-                        style = TextStyle(fontSize = 12.sp, color = ColorProvider(Color.White))
+                        text = emptyText,
+                        style = TextStyle(fontSize = 12.sp, color = GlanceTheme.colors.onSurface)
                     )
                 }
             } else {
                 val visiblePresets = presets.take(if (canUndo) 4 else 5)
-                for (preset in visiblePresets) {
+                visiblePresets.forEachIndexed { index, preset ->
                     val volumeStr = VolumeConverter.formatVolume(preset.volumeMl, displayUnit)
                     val iconRes = PresetIcon.getDrawableRes(preset.iconKey)
                     val presetColor = parseHexColor(preset.colorHex)
-
-                    // Tinted squircle preset tile
-                    val tileBg = getBlendedTileColor(presetColor)
+                    val tileBg = getAdaptiveTileColor(presetColor, isDark)
+                    val volumeTextColor = getAdaptiveTileVolumeColor(presetColor, isDark)
 
                     Box(
                         modifier = GlanceModifier
@@ -132,47 +156,49 @@ class QuickLogBarWidget : GlanceAppWidget() {
                             Image(
                                 provider = ImageProvider(iconRes),
                                 contentDescription = preset.label,
-                                modifier = GlanceModifier.size(20.dp)
+                                modifier = GlanceModifier.size(18.dp)
                             )
                             Spacer(modifier = GlanceModifier.height(2.dp))
                             Text(
                                 text = preset.label,
                                 maxLines = 1,
                                 style = TextStyle(
-                                    fontSize = 9.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = ColorProvider(Color.White)
+                                    color = GlanceTheme.colors.onSurface
                                 )
                             )
                             Text(
-                                text = "+$volumeStr",
+                                text = String.format(plusVolumeFormat, volumeStr),
                                 maxLines = 1,
                                 style = TextStyle(
-                                    fontSize = 8.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = ColorProvider(presetColor)
+                                    color = ColorProvider(volumeTextColor)
                                 )
                             )
                         }
                     }
-                    Spacer(modifier = GlanceModifier.width(5.dp))
+                    if (index < visiblePresets.lastIndex || canUndo) {
+                        Spacer(modifier = GlanceModifier.width(5.dp))
+                    }
                 }
                 if (canUndo) {
                     Box(
                         modifier = GlanceModifier
                             .height(56.dp)
-                            .background(ColorProvider(Color(0xFF1F3B54)))
+                            .background(GlanceTheme.colors.primaryContainer)
                             .cornerRadius(14.dp)
                             .padding(horizontal = 10.dp)
                             .clickable(actionRunCallback<UndoWidgetLogActionCallback>()),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Undo",
+                            text = undoLabel,
                             style = TextStyle(
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = ColorProvider(Color(0xFF34F3FF))
+                                color = GlanceTheme.colors.onPrimaryContainer
                             )
                         )
                     }
@@ -183,10 +209,7 @@ class QuickLogBarWidget : GlanceAppWidget() {
 }
 
 fun getBlendedTileColor(presetColor: Color): Color {
-    val r = (0x18 * (1f - 0.24f) + (presetColor.red * 255f) * 0.24f).toInt().coerceIn(0, 255)
-    val g = (0x24 * (1f - 0.24f) + (presetColor.green * 255f) * 0.24f).toInt().coerceIn(0, 255)
-    val b = (0x32 * (1f - 0.24f) + (presetColor.blue * 255f) * 0.24f).toInt().coerceIn(0, 255)
-    return Color(r, g, b)
+    return getAdaptiveTileColor(presetColor, isDark = true)
 }
 
 class QuickLogBarWidgetReceiver : GlanceAppWidgetReceiver() {

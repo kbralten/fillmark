@@ -13,6 +13,7 @@
       --text: #0d1e32;
       --muted: #556677;
       --accent: #007a87;
+      --on-accent: #ffffff;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -22,6 +23,7 @@
         --text: #f1f5f9;
         --muted: #94a3b8;
         --accent: #20d2de;
+        --on-accent: #091420;
       }
     }
     * { box-sizing: border-box; }
@@ -65,7 +67,7 @@
     }
     a.primary {
       background: var(--accent);
-      color: #091420;
+      color: var(--on-accent);
       border-color: transparent;
     }
   </style>

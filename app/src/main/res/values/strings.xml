@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Fillmark</string>
+    <string name="app_name" translatable="false">Fillmark</string>
     <string name="widget_progress_meter_description">Fillmark water progress meter</string>
     <string name="widget_quick_log_bar_description">Fillmark quick drink log presets</string>
     <string name="widget_full_dashboard_description">Fillmark full drink progress and presets</string>
@@ -20,10 +20,10 @@
 
     <string name="health_connect_rationale">Fillmark uses Android Health Connect (read and write hydration permissions) to sync your drink logs with other health and fitness apps on your device.\n\nFillmark operates no developer or third-party cloud servers, user accounts, analytics, or advertising trackers. Your data stays on your device, and if Android Cloud Auto Backup is enabled on your phone, it is backed up solely to your own personal Google Account.</string>
     <string name="health_connect_access_title">Health Connect Access</string>
-    <string name="privacy_policy_url">https://kbralten.github.io/fillmark/privacy.html</string>
+    <string name="privacy_policy_url" translatable="false">https://kbralten.github.io/fillmark/privacy.html</string>
     <string name="tile_log_water_label">Log Water</string>
-    <string name="github_repo_url">https://github.com/kbralten/fillmark</string>
-    <string name="github_issues_url">https://github.com/kbralten/fillmark/issues</string>
+    <string name="github_repo_url" translatable="false">https://github.com/kbralten/fillmark</string>
+    <string name="github_issues_url" translatable="false">https://github.com/kbralten/fillmark/issues</string>
 
     <!-- Navigation -->
     <string name="nav_today">Today</string>
@@ -162,7 +162,10 @@
     <string name="analytics_daily_average">Daily Average</string>
     <string name="analytics_total_intake">Total Intake</string>
     <string name="analytics_goal_hit_rate">Goal Hit Rate</string>
-    <string name="analytics_days_met_subtitle">%1$d of %2$d days</string>
+    <plurals name="analytics_days_met_subtitle">
+        <item quantity="one">%1$d of %2$d day</item>
+        <item quantity="other">%1$d of %2$d days</item>
+    </plurals>
     <string name="analytics_goal_streak">Goal Streak</string>
     <plurals name="streak_days">
         <item quantity="one">%d day</item>
@@ -178,7 +181,10 @@
     <string name="analytics_prev_period_cd">Previous period</string>
     <string name="analytics_jump_current_cd">Jump to current period</string>
     <string name="analytics_next_period_cd">Next period</string>
-    <string name="analytics_barchart_a11y">Hydration bar chart with %1$d periods. Double tap bars to inspect.</string>
+    <plurals name="analytics_barchart_a11y">
+        <item quantity="one">Hydration bar chart with %1$d period. Double tap bars to inspect.</item>
+        <item quantity="other">Hydration bar chart with %1$d periods. Double tap bars to inspect.</item>
+    </plurals>
     <string name="analytics_barchart_selected_a11y">%1$s: %2$s. Double tap another bar to inspect.</string>
     <string name="analytics_linechart_empty_a11y">Daily hydration chart with no entries recorded.</string>
     <string name="analytics_linechart_a11y">Daily hydration %1$s chart, total %2$s.</string>
@@ -206,11 +212,16 @@
     <string name="settings_pick_time_cd">Pick %1$s</string>
     <string name="settings_hc_title">Health Connect Integration</string>
     <string name="settings_hc_connected">Status: Connected and ready to sync.</string>
+    <string name="settings_hc_connected_outbound_only">Status: Outbound sync connected (write-only).</string>
+    <string name="settings_hc_connected_read_only">Status: Read permission granted (write permission needed for outbound sync).</string>
     <string name="settings_hc_needs_perms">Status: Health Connect available. Permissions required.</string>
     <string name="settings_hc_update_required">Status: Health Connect needs to be installed or updated.</string>
     <string name="settings_hc_unavailable">Status: Health Connect is not available on this device.</string>
     <string name="settings_hc_install_update">Install / Update Health Connect</string>
     <string name="settings_hc_grant_perms">Grant Health Connect Permissions</string>
+    <string name="settings_hc_grant_write_perm">Grant Write Permission</string>
+    <string name="settings_hc_grant_read_perm">Grant Read Permission for Inbound Sync</string>
+    <string name="settings_hc_inbound_needs_read">Grant Read permission to import drinks from other apps</string>
     <string name="settings_hc_outbound_sync">Enable Outbound Sync</string>
     <string name="settings_hc_inbound_sync">Bidirectional Inbound Sync</string>
     <string name="settings_hc_inbound_sync_desc">Import drinks logged in other fitness apps into Fillmark</string>
@@ -243,11 +254,22 @@
     <string name="settings_license_dialog_gpl">Fillmark is free, open-source software licensed under the GNU General Public License v3.0 (GPL-3.0).</string>
     <string name="settings_license_dialog_libs">Built with Android Jetpack (Compose, Room, DataStore, Glance, WorkManager, Health Connect) and Kotlinx Serialization (Apache 2.0).</string>
     <string name="settings_source_code">Source Code</string>
-    <string name="settings_exported_backup">Exported %1$d logs and %2$d presets</string>
+    <plurals name="logs_count">
+        <item quantity="one">%d log</item>
+        <item quantity="other">%d logs</item>
+    </plurals>
+    <plurals name="presets_count">
+        <item quantity="one">%d preset</item>
+        <item quantity="other">%d presets</item>
+    </plurals>
+    <string name="settings_exported_backup">Exported %1$s and %2$s</string>
     <string name="settings_export_failed">Export failed: %1$s</string>
-    <string name="settings_restored_backup">Restored %1$d logs and %2$d presets</string>
+    <string name="settings_restored_backup">Restored %1$s and %2$s</string>
     <string name="settings_restore_failed">Restore failed: %1$s</string>
-    <string name="settings_exported_csv">Exported %1$d drink logs to CSV</string>
+    <plurals name="settings_exported_csv">
+        <item quantity="one">Exported %1$d drink log to CSV</item>
+        <item quantity="other">Exported %1$d drink logs to CSV</item>
+    </plurals>
     <string name="settings_csv_failed">CSV export failed: %1$s</string>
     <string name="settings_cleared_data">All local data cleared</string>
     <string name="settings_clear_failed">Clear failed: %1$s</string>
@@ -268,4 +290,109 @@
     <string name="onboarding_hc_prompt">Sync hydration records with other fitness apps on your device.</string>
     <string name="onboarding_hc_connect">Connect Health Connect</string>
     <string name="onboarding_get_started">Get Started</string>
+
+    <!-- Custom Hydration Factor & Drink Name -->
+    <string name="drink_name_optional_label">Drink Name (optional)</string>
+    <string name="drink_name_placeholder">e.g. Morning Matcha, Stanley 40oz</string>
+    <string name="hydration_factor_label">Hydration Factor</string>
+    <string name="hydration_factor_error">Enter a factor between 0.1x and 2.0x</string>
+    <string name="action_reset">Reset</string>
+    <string name="history_type_and_time">%1$s · %2$s</string>
+
+    <!-- History Search, Filtering, Quick-Add, Swipe-to-Delete -->
+    <string name="history_search_hint">Search drinks or volumes…</string>
+    <string name="history_clear_search_cd">Clear search</string>
+    <string name="history_filter_date_cd">Filter by date</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_no_matches">No drink logs match your current filters.</string>
+    <string name="history_clear_filters">Clear Filters</string>
+    <string name="history_add_drink_cd">Log past or current drink</string>
+    <string name="history_delete_confirm_title">Delete Drink Entry?</string>
+    <string name="history_delete_confirm_body">Remove %1$s (%2$s) from your log history?</string>
+    <string name="action_delete">Delete</string>
+
+    <!-- Daily Goal Estimator -->
+    <string name="estimator_button">Estimate starting goal</string>
+    <string name="estimator_title">Daily Goal Estimator</string>
+    <string name="estimator_subtitle">Get a rough starting target based on body weight and activity level.</string>
+    <string name="estimator_weight_label">Body Weight</string>
+    <string name="estimator_weight_kg">kg</string>
+    <string name="estimator_weight_lb">lb</string>
+    <string name="estimator_weight_error">Enter a valid weight</string>
+    <string name="estimator_activity_label">Activity Level</string>
+    <string name="estimator_activity_low">Low</string>
+    <string name="estimator_activity_moderate">Moderate</string>
+    <string name="estimator_activity_high">Active</string>
+    <string name="estimator_warm_climate">Warm or dry climate (+300 ml)</string>
+    <string name="estimator_result_label">Suggested Starting Target</string>
+    <string name="estimator_disclaimer">General wellness estimate only — not medical advice. Adjust anytime to fit your needs.</string>
+    <string name="estimator_use_estimate">Use Estimate</string>
+
+    <!-- Habit-Loop Celebration -->
+    <string name="meter_goal_reached_badge">Goal Reached!</string>
+
+    <!-- Pacing -->
+    <string name="pacing_ahead">Ahead of pace (+%1$s)</string>
+    <string name="pacing_on_track">On track with daily goal</string>
+    <string name="pacing_behind">Behind pace by %1$s</string>
+
+    <!-- Analytics Intervals, Modes & Periods -->
+    <string name="analytics_interval_day">Day</string>
+    <string name="analytics_interval_week">Week</string>
+    <string name="analytics_interval_month">Month</string>
+    <string name="analytics_interval_3m">3M</string>
+    <string name="analytics_interval_year">Year</string>
+    <string name="analytics_interval_all">All</string>
+    <string name="analytics_mode_cumulative">Cumulative</string>
+    <string name="analytics_mode_rate">Rate</string>
+    <string name="analytics_period_today">Today (%1$s)</string>
+    <string name="analytics_period_yesterday">Yesterday (%1$s)</string>
+    <string name="analytics_period_this_week">This Week (%1$s – %2$s)</string>
+    <string name="analytics_period_last_week">Last Week (%1$s – %2$s)</string>
+    <string name="analytics_period_past_30_days">Past 30 Days (%1$s – %2$s)</string>
+    <string name="analytics_period_past_12_weeks">Past 12 Weeks (%1$s – %2$s)</string>
+    <string name="analytics_period_past_52_weeks">Past 52 Weeks (%1$s – %2$s)</string>
+    <string name="analytics_period_all_time">All Time</string>
+    <string name="analytics_period_range">%1$s – %2$s</string>
+    <string name="unit_per_hour_suffix">%1$s/h</string>
+
+    <!-- Drink Types, Preset Icons, Theme Modes, Default Presets -->
+    <string name="drink_type_water">Water</string>
+    <string name="drink_type_coffee">Coffee</string>
+    <string name="drink_type_tea">Tea</string>
+    <string name="drink_type_juice">Juice</string>
+    <string name="drink_type_electrolyte">Electrolyte</string>
+    <string name="drink_type_soda">Soda</string>
+    <string name="drink_type_milk">Milk</string>
+    <string name="drink_type_other">Other</string>
+
+    <string name="preset_icon_glass">Glass</string>
+    <string name="preset_icon_mug">Mug</string>
+    <string name="preset_icon_bottle">Water Bottle</string>
+    <string name="preset_icon_can">Can</string>
+    <string name="preset_icon_tumbler">Tumbler</string>
+
+    <string name="theme_mode_system">System</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
+
+    <string name="preset_default_glass">Glass</string>
+    <string name="preset_default_coffee_mug">Coffee Mug</string>
+    <string name="preset_default_water_bottle">Water Bottle</string>
+    <string name="preset_default_tumbler">Tumbler</string>
+    <string name="preset_default_large_bottle">Large Bottle</string>
+
+    <!-- Widgets, TileService & App Shortcuts -->
+    <string name="widget_tap_open">Tap to open Fillmark</string>
+    <string name="widget_open_add_presets">Open Fillmark to add presets</string>
+    <string name="widget_progress_cd">Progress: %1$d%%</string>
+    <string name="widget_manual_log_cd">Manual log drink</string>
+    <string name="widget_logged_toast">Logged +%1$s (%2$s)</string>
+    <string name="widget_undid_toast">Undid %1$s</string>
+    <string name="widget_default_drink">drink</string>
+    <string name="tile_log_preset">Log %1$s</string>
+    <string name="shortcut_preset_short">%1$s (+%2$s)</string>
+    <string name="shortcut_preset_long">Log %1$s (%2$s)</string>
+    <string name="shortcut_manual_short">Custom Drink</string>
+    <string name="shortcut_manual_long">Log Custom Drink</string>
 </resources>

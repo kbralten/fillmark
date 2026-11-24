@@ -20,11 +20,20 @@ val releaseKeyAliasProp = providers.gradleProperty("RELEASE_KEY_ALIAS")
 val releaseKeyPasswordProp = providers.gradleProperty("RELEASE_KEY_PASSWORD")
   .orElse(providers.environmentVariable("RELEASE_KEY_PASSWORD"))
   .orNull
+val requireReleaseSigning = providers.gradleProperty("requireReleaseSigning")
+  .map { it.toBoolean() }
+  .getOrElse(false)
 val hasReleaseSigning = !releaseStoreFileProp.isNullOrBlank() &&
   !releaseStorePasswordProp.isNullOrBlank() &&
   !releaseKeyAliasProp.isNullOrBlank() &&
   !releaseKeyPasswordProp.isNullOrBlank() &&
   file(releaseStoreFileProp).exists()
+
+if (requireReleaseSigning && !hasReleaseSigning) {
+  throw GradleException(
+    "Release signing is required (-PrequireReleaseSigning=true), but signing secrets or RELEASE_STORE_FILE are missing."
+  )
+}
 
 android {
   namespace = "com.fillmark.app"
@@ -80,6 +89,21 @@ android {
     shaders = false
   }
 
+  sourceSets {
+    getByName("debug").assets.srcDir("$projectDir/schemas")
+    getByName("androidTest").assets.srcDir("$projectDir/schemas")
+  }
+
+  testOptions {
+    unitTests {
+      isReturnDefaultValues = true
+      isIncludeAndroidResources = true
+      all {
+        it.maxHeapSize = "2g"
+      }
+    }
+  }
+
   packaging {
     resources {
       excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -127,15 +151,22 @@ dependencies {
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-  // Local tests: jUnit, coroutines, Android runner
+  // Local tests: jUnit, coroutines, Robolectric, Compose UI, Room migration testing
+  testImplementation(composeBom)
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.robolectric)
+  testImplementation(libs.room.testing)
+  testImplementation(libs.androidx.test.core)
+  testImplementation(libs.androidx.test.ext.junit)
+  testImplementation(libs.androidx.compose.ui.test.junit4)
 
   // Instrumented tests: jUnit rules and runners
   androidTestImplementation(libs.androidx.test.core)
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.espresso.core)
+  androidTestImplementation(libs.room.testing)
 
   // Room Persistence
   implementation(libs.room.runtime)

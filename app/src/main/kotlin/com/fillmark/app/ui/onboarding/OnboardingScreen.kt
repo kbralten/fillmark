@@ -50,12 +50,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.fillmark.app.R
 import com.fillmark.app.core.DisplayUnit
 import com.fillmark.app.core.ShortcutHelper
 import com.fillmark.app.core.VolumeConverter
 import com.fillmark.app.data.local.UserPreferencesRepository
+import com.fillmark.app.sync.HealthConnectAvailabilityUi
 import com.fillmark.app.sync.HealthConnectManager
+import com.fillmark.app.ui.common.DailyGoalEstimatorDialog
 import com.fillmark.app.ui.settings.TimePickerField
 import com.fillmark.app.ui.settings.TimePickerModalDialog
 import com.fillmark.app.widget.WidgetUpdateHelper
@@ -84,18 +87,31 @@ fun OnboardingScreen(
     var sleepTime by remember { mutableStateOf("23:00") }
     var showWakePicker by remember { mutableStateOf(false) }
     var showSleepPicker by remember { mutableStateOf(false) }
+    var showEstimatorDialog by remember { mutableStateOf(false) }
     var healthConnectEnabled by remember { mutableStateOf(false) }
 
-    val hcAvailable = remember { hcManager.isAvailable() }
+    var hcSdkStatus by remember { mutableIntStateOf(hcManager.getSdkStatus()) }
+    val hcAvailability = HealthConnectManager.resolveAvailabilityUi(hcSdkStatus)
+
+    LifecycleResumeEffect(Unit) {
+        hcSdkStatus = hcManager.getSdkStatus()
+        scope.launch {
+            if (hcManager.isAvailable() && hcManager.hasWritePermission()) {
+                healthConnectEnabled = true
+            }
+        }
+        onPauseOrDispose {}
+    }
+
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) { granted ->
-        if (granted.containsAll(hcManager.permissions)) {
+        if (hcManager.writePermission in granted) {
             healthConnectEnabled = true
         }
     }
 
-    val parsedTarget = targetInput.toDoubleOrNull() ?: 0.0
+    val parsedTarget = VolumeConverter.parseDecimalInput(targetInput) ?: 0.0
     val targetMl = if (hasGoal) VolumeConverter.toInternalMl(parsedTarget, selectedUnit) else 0.0
     val targetValid = !hasGoal || (targetMl > 0.0 && targetMl <= VolumeConverter.MAX_DAILY_TARGET_ML)
 
@@ -268,6 +284,10 @@ fun OnboardingScreen(
                                 )
                             }
 
+                            TextButton(onClick = { showEstimatorDialog = true }) {
+                                Text(stringResource(R.string.estimator_button))
+                            }
+
                             Text(
                                 text = stringResource(R.string.wellness_disclaimer),
                                 style = MaterialTheme.typography.bodySmall,
@@ -336,7 +356,7 @@ fun OnboardingScreen(
                                 }
                             }
 
-                            if (hcAvailable) {
+                            if (hcAvailability != HealthConnectAvailabilityUi.UNAVAILABLE) {
                                 Card(
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -352,22 +372,40 @@ fun OnboardingScreen(
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.SemiBold
                                         )
-                                        Text(
-                                            text = if (healthConnectEnabled) {
-                                                stringResource(R.string.onboarding_hc_connected)
-                                            } else {
-                                                stringResource(R.string.onboarding_hc_prompt)
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        if (!healthConnectEnabled) {
-                                            OutlinedButton(
-                                                onClick = { requestPermissionsLauncher.launch(hcManager.permissions) },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Text(stringResource(R.string.onboarding_hc_connect))
+                                        when (hcAvailability) {
+                                            HealthConnectAvailabilityUi.INSTALL_OR_UPDATE_REQUIRED -> {
+                                                Text(
+                                                    text = stringResource(R.string.settings_hc_update_required),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                OutlinedButton(
+                                                    onClick = { HealthConnectManager.openPlayStore(context) },
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Text(stringResource(R.string.settings_hc_install_update))
+                                                }
                                             }
+                                            HealthConnectAvailabilityUi.AVAILABLE -> {
+                                                Text(
+                                                    text = if (healthConnectEnabled) {
+                                                        stringResource(R.string.onboarding_hc_connected)
+                                                    } else {
+                                                        stringResource(R.string.onboarding_hc_prompt)
+                                                    },
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                if (!healthConnectEnabled) {
+                                                    OutlinedButton(
+                                                        onClick = { requestPermissionsLauncher.launch(hcManager.permissions) },
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Text(stringResource(R.string.onboarding_hc_connect))
+                                                    }
+                                                }
+                                            }
+                                            HealthConnectAvailabilityUi.UNAVAILABLE -> Unit
                                         }
                                     }
                                 }
@@ -427,6 +465,17 @@ fun OnboardingScreen(
             onConfirm = {
                 sleepTime = it
                 showSleepPicker = false
+            }
+        )
+    }
+    if (showEstimatorDialog) {
+        DailyGoalEstimatorDialog(
+            displayUnit = selectedUnit,
+            onDismiss = { showEstimatorDialog = false },
+            onApplyEstimateMl = { estimatedMl ->
+                hasGoal = true
+                targetInput = VolumeConverter.formatInputNumber(estimatedMl, selectedUnit)
+                showEstimatorDialog = false
             }
         )
     }

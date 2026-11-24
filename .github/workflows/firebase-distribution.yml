@@ -31,6 +31,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Run Unit Tests, AndroidTest Compile, and Release Lint
+        run: ./gradlew testDebugUnitTest compileDebugAndroidTestKotlin lintRelease --no-daemon
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug -PversionCode=${{ github.run_number }}
 

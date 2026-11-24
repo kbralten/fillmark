@@ -1,5 +1,6 @@
 package com.fillmark.app.ui.dashboard.components
 
+import androidx.core.graphics.toColorInt
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -33,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -92,22 +95,26 @@ fun QuickPresetBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             presets.forEach { preset ->
+                val haptic = LocalHapticFeedback.current
                 PresetCard(
                     preset = preset,
                     displayUnit = displayUnit,
-                    onClick = { onPresetClick(preset) },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onPresetClick(preset)
+                    },
                     onLongClick = { onEditPreset(preset) }
                 )
             }
 
             // Add Preset Card (matching tinted squircle style)
-            val newCardBg = getBlendedTileColor(FillmarkCyan)
+            val accentColor = MaterialTheme.colorScheme.primary
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = newCardBg
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
                 ),
-                border = BorderStroke(1.dp, FillmarkCyan.copy(alpha = 0.35f)),
+                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
                 modifier = Modifier
                     .widthIn(min = 90.dp)
                     .heightIn(min = 118.dp)
@@ -127,7 +134,7 @@ fun QuickPresetBar(
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = stringResource(R.string.add_custom_preset_cd),
-                        tint = FillmarkCyan,
+                        tint = accentColor,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -135,7 +142,7 @@ fun QuickPresetBar(
                         text = stringResource(R.string.quick_preset_new),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = FillmarkCyan
+                        color = accentColor
                     )
                     Spacer(modifier = Modifier.weight(1f))
                 }
@@ -237,7 +244,7 @@ fun getBlendedTileColor(presetColor: Color): Color {
 fun parseHexColor(hex: String): Color {
     return try {
         val clean = hex.removePrefix("#")
-        Color(android.graphics.Color.parseColor("#$clean"))
+        Color("#$clean".toColorInt())
     } catch (_: Exception) {
         FillmarkCyan
     }
