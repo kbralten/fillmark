@@ -13,6 +13,7 @@ import com.fillmark.app.data.local.entity.DailyTargetEntity
 import com.fillmark.app.data.local.entity.HydrationRecordEntity
 import com.fillmark.app.data.local.entity.PresetEntity
 import com.fillmark.app.sync.HealthConnectManager
+import com.fillmark.app.widget.WidgetRefreshScheduler
 import com.fillmark.app.widget.WidgetUpdateHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -297,6 +298,7 @@ object BackupManager {
                 )
             },
             refreshUi = {
+                WidgetRefreshScheduler.syncSchedule(context)
                 WidgetUpdateHelper.updateAllWidgets(context)
                 ShortcutHelper.updateShortcuts(context)
             }

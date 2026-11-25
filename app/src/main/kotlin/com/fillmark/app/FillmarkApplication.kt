@@ -3,6 +3,7 @@ package com.fillmark.app
 import android.app.Application
 import com.fillmark.app.core.ShortcutHelper
 import com.fillmark.app.widget.MidnightAlarmScheduler
+import com.fillmark.app.widget.WidgetRefreshScheduler
 import com.fillmark.app.widget.WidgetUpdateHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,7 @@ class FillmarkApplication : Application() {
         MidnightAlarmScheduler.scheduleMidnightReset(this)
 
         CoroutineScope(Dispatchers.Default).launch {
+            WidgetRefreshScheduler.syncSchedule(this@FillmarkApplication)
             WidgetUpdateHelper.updateAllWidgets(this@FillmarkApplication)
             ShortcutHelper.updateShortcuts(this@FillmarkApplication)
         }

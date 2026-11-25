@@ -99,7 +99,12 @@
             android:name=".widget.WidgetMidnightReceiver"
             android:exported="false" />
 
-        <!-- System Date/Time/Boot Broadcast Receiver -->
+        <!-- Internal Pacing Refresh Alarm Receiver -->
+        <receiver
+            android:name=".widget.WidgetPacingRefreshReceiver"
+            android:exported="false" />
+
+        <!-- System Date/Time/Boot/Package Broadcast Receiver -->
         <receiver
             android:name=".widget.WidgetSystemEventReceiver"
             android:exported="true">
@@ -108,6 +113,7 @@
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

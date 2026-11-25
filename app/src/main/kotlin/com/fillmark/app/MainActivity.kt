@@ -29,6 +29,7 @@ import com.fillmark.app.sync.HealthConnectManager
 import com.fillmark.app.ui.onboarding.OnboardingScreen
 import com.fillmark.app.ui.theme.FillmarkTheme
 import com.fillmark.app.widget.MidnightAlarmScheduler
+import com.fillmark.app.widget.WidgetRefreshScheduler
 import com.fillmark.app.widget.WidgetUpdateHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -162,6 +163,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         MidnightAlarmScheduler.scheduleMidnightReset(this)
         lifecycleScope.launch {
+            WidgetRefreshScheduler.syncSchedule(this@MainActivity)
             WidgetUpdateHelper.updateAllWidgets(this@MainActivity)
             val prefsRepo = UserPreferencesRepository(this@MainActivity)
             val prefs = prefsRepo.preferencesFlow.first()

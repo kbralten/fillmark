@@ -1,8 +1,10 @@
 package com.fillmark.app.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -56,7 +58,11 @@ import com.fillmark.app.data.local.entity.PresetEntity
 import com.fillmark.app.domain.PacingCalculator
 import com.fillmark.app.domain.PacingResult
 import com.fillmark.app.ui.dashboard.components.parseHexColor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -80,9 +86,15 @@ class FullDashboardWidget : GlanceAppWidget() {
         val initialPresets = database.presetDao().getAllPresets()
 
         provideContent {
-            val currentDateTime by remember {
-                WidgetTimingHelper.activeClockFlow()
-            }.collectAsState(initial = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))
+            val refreshTick by WidgetTimingHelper.clockRefreshVersion.collectAsState()
+            val clockState by remember(refreshTick) {
+                WidgetTimingHelper.activeClockFlow().map { refreshTick to it }
+            }.collectAsState(initial = refreshTick to LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))
+            val currentDateTime = if (clockState.first == refreshTick) {
+                clockState.second
+            } else {
+                remember(refreshTick) { LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) }
+            }
             val currentDate = currentDateTime.toLocalDate()
             val currentTime = currentDateTime.toLocalTime()
 
@@ -96,7 +108,7 @@ class FullDashboardWidget : GlanceAppWidget() {
 
             val targetEntity by remember(dateIso) {
                 database.dailyTargetDao().observeTargetForDate(dateIso)
-            }.collectAsState(initial = initialTarget)
+            }.collectAsState(initial = if (dateIso == initialDateIso) initialTarget else null)
 
             val prefs by remember {
                 prefsRepo.preferencesFlow
@@ -166,6 +178,10 @@ class FullDashboardWidget : GlanceAppWidget() {
                     putExtra(ShortcutHelper.EXTRA_OPEN_MANUAL_LOG, true)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
+            }
+
+            SideEffect {
+                WidgetTimingHelper.markWidgetComposed(id, refreshTick)
             }
 
             FillmarkWidgetTheme(
@@ -439,4 +455,44 @@ class FullDashboardWidget : GlanceAppWidget() {
 
 class FullDashboardWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = FullDashboardWidget()
+
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
+        WidgetTimingHelper.notifyClockRefresh()
+        MidnightAlarmScheduler.scheduleMidnightReset(context)
+        WidgetRefreshScheduler.ensurePeriodicWorkScheduled(context)
+        val appContext = context.applicationContext ?: context
+        CoroutineScope(Dispatchers.Default).launch {
+            runCatching { WidgetRefreshScheduler.syncSchedule(appContext) }
+        }
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        MidnightAlarmScheduler.scheduleMidnightReset(context)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                WidgetRefreshScheduler.syncSchedule(context)
+            } finally {
+                pendingResult?.finish()
+            }
+        }
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                WidgetRefreshScheduler.syncSchedule(context)
+            } finally {
+                pendingResult?.finish()
+            }
+        }
+    }
 }

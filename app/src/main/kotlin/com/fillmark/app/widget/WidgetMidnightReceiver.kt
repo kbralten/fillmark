@@ -34,7 +34,8 @@ class WidgetSystemEventReceiver : BroadcastReceiver() {
             action != Intent.ACTION_DATE_CHANGED &&
             action != Intent.ACTION_TIME_CHANGED &&
             action != Intent.ACTION_TIMEZONE_CHANGED &&
-            action != Intent.ACTION_BOOT_COMPLETED
+            action != Intent.ACTION_BOOT_COMPLETED &&
+            action != Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
             Log.w(TAG, "Ignoring unallowed broadcast action: $action")
             return
@@ -54,11 +55,12 @@ private fun BroadcastReceiver.handleWidgetRefreshBroadcast(
     // Reschedule alarm for next midnight
     MidnightAlarmScheduler.scheduleMidnightReset(context)
 
-    // Asynchronously update all widgets
+    // Asynchronously sync pacing schedule and update all widgets
     val pendingResult = goAsync()
     CoroutineScope(Dispatchers.Default).launch {
         try {
-            WidgetUpdateHelper.updateAllWidgets(context)
+            WidgetRefreshScheduler.syncSchedule(context)
+            WidgetUpdateHelper.updateAllWidgets(context, awaitRender = true)
         } catch (e: Exception) {
             Log.w(tag, "Error updating widgets on broadcast", e)
         } finally {

@@ -16,6 +16,7 @@ import com.fillmark.app.data.local.ThemeMode
 import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.data.repository.HydrationRepository
 import com.fillmark.app.sync.HealthConnectManager
+import com.fillmark.app.widget.WidgetRefreshScheduler
 import com.fillmark.app.widget.WidgetUpdateHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -138,6 +139,7 @@ class SettingsViewModel @JvmOverloads constructor(
     fun setWakingSchedule(start: String, end: String, pacingEnabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.updateWakingSchedule(start, end, pacingEnabled)
+            WidgetRefreshScheduler.syncSchedule(getApplication())
             WidgetUpdateHelper.updateAllWidgets(getApplication())
         }
     }
@@ -274,6 +276,7 @@ class SettingsViewModel @JvmOverloads constructor(
             var cleared = false
             val message = runCatching {
                 hydrationRepository.clearAllData()
+                WidgetRefreshScheduler.syncSchedule(app)
                 WidgetUpdateHelper.updateAllWidgets(app)
                 ShortcutHelper.updateShortcuts(app)
                 cleared = true

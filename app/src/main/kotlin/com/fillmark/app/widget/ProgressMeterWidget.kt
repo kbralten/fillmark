@@ -1,7 +1,9 @@
 package com.fillmark.app.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -45,7 +47,11 @@ import com.fillmark.app.data.local.FillmarkDatabase
 import com.fillmark.app.data.local.UserPreferencesRepository
 import com.fillmark.app.domain.PacingCalculator
 import com.fillmark.app.domain.PacingResult
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -68,9 +74,15 @@ class ProgressMeterWidget : GlanceAppWidget() {
         val initialPrefs = prefsRepo.preferencesFlow.first()
 
         provideContent {
-            val currentDateTime by remember {
-                WidgetTimingHelper.activeClockFlow()
-            }.collectAsState(initial = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))
+            val refreshTick by WidgetTimingHelper.clockRefreshVersion.collectAsState()
+            val clockState by remember(refreshTick) {
+                WidgetTimingHelper.activeClockFlow().map { refreshTick to it }
+            }.collectAsState(initial = refreshTick to LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))
+            val currentDateTime = if (clockState.first == refreshTick) {
+                clockState.second
+            } else {
+                remember(refreshTick) { LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) }
+            }
             val currentDate = currentDateTime.toLocalDate()
             val currentTime = currentDateTime.toLocalTime()
 
@@ -84,7 +96,7 @@ class ProgressMeterWidget : GlanceAppWidget() {
 
             val targetEntity by remember(dateIso) {
                 database.dailyTargetDao().observeTargetForDate(dateIso)
-            }.collectAsState(initial = initialTarget)
+            }.collectAsState(initial = if (dateIso == initialDateIso) initialTarget else null)
 
             val prefs by remember {
                 prefsRepo.preferencesFlow
@@ -130,6 +142,10 @@ class ProgressMeterWidget : GlanceAppWidget() {
                     heightDp = 18,
                     isDark = isDark
                 )
+            }
+
+            SideEffect {
+                WidgetTimingHelper.markWidgetComposed(id, refreshTick)
             }
 
             FillmarkWidgetTheme(
@@ -260,4 +276,44 @@ class ProgressMeterWidget : GlanceAppWidget() {
 
 class ProgressMeterWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = ProgressMeterWidget()
+
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
+        WidgetTimingHelper.notifyClockRefresh()
+        MidnightAlarmScheduler.scheduleMidnightReset(context)
+        WidgetRefreshScheduler.ensurePeriodicWorkScheduled(context)
+        val appContext = context.applicationContext ?: context
+        CoroutineScope(Dispatchers.Default).launch {
+            runCatching { WidgetRefreshScheduler.syncSchedule(appContext) }
+        }
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        MidnightAlarmScheduler.scheduleMidnightReset(context)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                WidgetRefreshScheduler.syncSchedule(context)
+            } finally {
+                pendingResult?.finish()
+            }
+        }
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                WidgetRefreshScheduler.syncSchedule(context)
+            } finally {
+                pendingResult?.finish()
+            }
+        }
+    }
 }
